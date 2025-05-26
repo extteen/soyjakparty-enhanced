@@ -95,10 +95,11 @@
 
 
         const links = [
-            { text: 'Soybooru', href: 'https://soybooru.com/', icon: 'icons/mainpage/booru.png' }, 
+            { text: 'Soybooru', href: 'https://soybooru.com/', icon: 'icons/mainpage/booru.png' },
             { text: 'Soyjak Wiki', href: 'https://wiki.soyjak.st/', icon: 'icons/mainpage/wiki.png' },
             { text: 'The Soysylum', href: 'https://soysylum.org/Main_Page', icon: 'icons/mainpage/soysylum.png' },
-            { text: 'The Dailyjak', href: 'https://t.me/thedailyjak', icon: 'icons/mainpage/dailyjak.jpg' } 
+            { text: 'The Dailyjak', href: 'https://t.me/thedailyjak', icon: 'icons/mainpage/dailyjak.jpg' }
+        ];
 
         links.forEach(linkInfo => {
             const linkElement = document.createElement('a');
@@ -174,7 +175,7 @@
                 top: auto;
                 left: auto;
                 color: white;
-                font-size: 20px
+                font-size: 20px;
                 font-weight: bold;
                 text-shadow: 1px 1px 2px black, 0 0 3px black;
                 text-align: right;
