@@ -1,12 +1,56 @@
 // MAIN FUNCTIONS O ALGO
 // EXTTEEN RELEASE (CHANGE THIS COMMENT IF YOU MODDED)
 //spaghetti code
-console.log("Check 1");
 
 const audio = new Audio();
 audio.preload = "auto";
 audio.crossOrigin = "anonymous";
 audio.volume = 0.5;
+
+//theme handling test
+
+function getActiveThemeCSS() {
+    const themeLink = [...document.querySelectorAll('link[rel="stylesheet"]')]
+        .find(link => link.href.includes('/stylesheets/') && !link.href.includes('font-awesome'));
+    return themeLink?.href;
+}
+
+async function applyActiveTheme(extensionRoot) {
+    const isTransparent = localStorage.getItem('transparencyDisabled') !== 'true';
+    if (!isTransparent) {
+        const themeCSS = getActiveThemeCSS();
+        if (!themeCSS) return;
+
+        const response = await fetch(themeCSS);
+        let cssText = await response.text();
+
+        const boardStyles = getComputedStyle(document.body);
+        const baseFont = boardStyles.font;
+
+        const style = document.createElement('style');
+        style.textContent = `
+        :host {
+            all: initial;
+            font: ${baseFont} !important;
+            color: inherit;
+        }
+
+        * {
+            font: inherit !important;
+            font-family: inherit !important;
+            font-size: inherit !important;
+            font-weight: inherit !important;
+        }
+        
+        ${cssText}
+    `;
+
+        extensionRoot.shadowRoot.appendChild(style);
+    } else {
+        
+        updateTransparencyEffects();
+    }
+}
 
 function createSEClockMenu() {
     const TIMEZONES = [
@@ -61,44 +105,133 @@ function createSEClockMenu() {
         },
     ];
 
+    const extensionHost = document.createElement('div');
+    extensionHost.id = 'spe-extension';
+    document.body.appendChild(extensionHost);
+
+    const shadowRoot = extensionHost.attachShadow({ mode: 'open' });
+
+
 
     const getActivityStatus = (hour) => {
         if (hour >= 0 && hour < 6) return 'Sleeping';
-        if (hour >= 6 && hour < 10) return 'Partially Inactive'; //maybe change this i am not a big fan
+        if (hour >= 6 && hour < 10) return 'Partially Inactive';
         if (hour >= 10 && hour < 18) return 'Mostly Active';
         if (hour >= 18 && hour < 23) return 'Fully Active';
         return 'Winding Down';
     };
 
     const toggleBtn = document.createElement('button');
-    toggleBtn.textContent = 'Show SPE Menu';
+    toggleBtn.textContent = '▼ SPE Menu';
     toggleBtn.style.position = 'fixed';
-    toggleBtn.style.bottom = '40px'; 
-    toggleBtn.style.right = '20px'; 
+    toggleBtn.style.top = '25px';
+    toggleBtn.style.right = '10px';
     toggleBtn.style.zIndex = '9999';
-    toggleBtn.style.padding = '6px 12px';
-    toggleBtn.style.border = '1px solid #888';
-    toggleBtn.style.background = '#eee';
+    toggleBtn.style.padding = '6px 8px';
+
     toggleBtn.style.borderRadius = '5px';
     toggleBtn.style.cursor = 'pointer';
-    toggleBtn.style.fontSize = '13px';
+    toggleBtn.style.fontSize = '12px';
+   
 
     document.body.appendChild(toggleBtn);
 
     const menuBox = document.createElement('div');
     menuBox.style.position = 'fixed';
-    menuBox.style.bottom = '80px';  
-    menuBox.style.right = '20px'; 
-    menuBox.style.background = '#f8f9fa';
-    menuBox.style.border = '1px solid #ccc';
+    menuBox.style.top = '60px';
+    menuBox.style.right = '10px'; 
+    menuBox.style.zIndex = '100000';
+    menuBox.style.backdropFilter = 'blur(20px)';
+    menuBox.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+    menuBox.style.WebkitBackdropFilter = 'blur(10px)'
     menuBox.style.borderRadius = '6px';
     menuBox.style.boxShadow = '0 2px 6px rgba(0,0,0,0.2)';
     menuBox.style.padding = '10px 15px';
-    menuBox.style.fontFamily = 'monospace';
+
     menuBox.style.fontSize = '13px';
     menuBox.style.zIndex = '9999';
     menuBox.style.minWidth = '230px';
     menuBox.style.display = 'none';
+    menuBox.style.maxHeight = '80vh';
+    menuBox.style.overflowY = 'auto';
+
+
+    const clocksSection = document.createElement('div');
+    clocksSection.id = 'clocks-section';
+
+
+    const clocksHeader = document.createElement('div');
+    clocksHeader.style.display = 'flex';
+    clocksHeader.style.justifyContent = 'space-between';
+    clocksHeader.style.alignItems = 'center';
+    clocksHeader.style.marginBottom = '10px';
+
+    // Timezone title o algo
+    const clocksTitle = document.createElement('div');
+    clocksTitle.textContent = 'Timezones';
+    clocksTitle.style.fontWeight = 'bold';
+
+    // Top contols toggles
+    const soundToggle = document.createElement('button');
+    soundToggle.textContent = localStorage.getItem('notifEnabled') === 'true' ? '🔊' : '🔇';
+    soundToggle.title = 'Toggle notification sounds';
+    soundToggle.style.padding = '4px 8px';
+
+
+    soundToggle.style.borderRadius = '4px';
+    soundToggle.style.cursor = 'pointer';
+    soundToggle.style.fontSize = '14px';
+
+    const gcpToggle = document.createElement('button');
+    gcpToggle.textContent = localStorage.getItem('GCPEnabled') === 'true' ? '🟢' : '🔴';
+    gcpToggle.title = 'Toggle GCP dot';
+    gcpToggle.style.padding = '4px 8px';
+
+
+    gcpToggle.style.borderRadius = '4px';
+    gcpToggle.style.cursor = 'pointer';
+    gcpToggle.style.fontSize = '14px';
+    gcpToggle.style.marginLeft = '8px'; 
+
+    const transparencyToggle = document.createElement('button');
+    transparencyToggle.textContent = localStorage.getItem('transparencyDisabled') === 'true' ? '◼' : '◻';
+    transparencyToggle.title = 'Toggle transparency effects';
+    transparencyToggle.style.padding = '4px 8px';
+    transparencyToggle.style.borderRadius = '4px';
+    transparencyToggle.style.cursor = 'pointer';
+    transparencyToggle.style.fontSize = '14px';
+    transparencyToggle.style.marginLeft = '8px';
+
+    const searchmodeToggle = document.createElement('button');
+    searchmodeToggle.textContent = localStorage.getItem('soybooruDirectSearch') === 'true' ? '🌐' : '🔍';
+    searchmodeToggle.title = 'Toggle Soybooru Search mode';
+    searchmodeToggle.style.padding = '4px 8px';
+    searchmodeToggle.style.borderRadius = '4px';
+    searchmodeToggle.style.cursor = 'pointer';
+    searchmodeToggle.style.fontSize = '14px';
+    searchmodeToggle.style.marginLeft = '8px';
+
+    clocksHeader.appendChild(clocksTitle);
+    
+    clocksSection.insertBefore(clocksHeader, clocksSection.firstChild);
+
+    const settingsContainer = document.createElement('div');
+    settingsContainer.id = 'settings-container';
+    settingsContainer.style.display = 'none';
+
+
+    const expandBtn = document.createElement('button');
+    expandBtn.textContent = '▼ Expand Settings ⚙';
+    expandBtn.style.width = '100%';
+    expandBtn.style.marginTop = '10px';
+    expandBtn.style.padding = '4px 0';
+    expandBtn.style.background = 'none';
+    expandBtn.style.border = 'none';
+
+    expandBtn.style.cursor = 'pointer';
+    expandBtn.style.textAlign = 'right';
+    expandBtn.style.fontSize = '12px';
+    
 
     TIMEZONES.forEach(({ label, clockId, statusId, icon }) => {
         const row = document.createElement('div');
@@ -118,16 +251,34 @@ function createSEClockMenu() {
         const textContainer = document.createElement('div');
         textContainer.innerHTML = `
             <strong>${label}:</strong> <span id="${clockId}">--:--:--</span><br>
-            <span id="${statusId}" style="color: #666; font-size: 12px;">Checking...</span>
+            <span id="${statusId}" style="font-size: 12px;">Checking...</span>
         `;
 
         row.appendChild(img);
         row.appendChild(textContainer);
-        menuBox.appendChild(row);
+        clocksSection.appendChild(row);
     });
 
+    const topControls = document.createElement('div');
+    topControls.style.display = 'flex';
+    topControls.style.justifyContent = 'flex-end';
+    topControls.style.alignItems = 'center';
+    topControls.style.marginBottom = '10px';
+
+    topControls.appendChild(soundToggle);
+    topControls.appendChild(gcpToggle);
+    topControls.appendChild(transparencyToggle);
+    topControls.appendChild(searchmodeToggle);
+
     const settingsDivider = document.createElement('hr');
+    settingsDivider.style.marginTop = '10px';
+
+    menuBox.appendChild(topControls);
     menuBox.appendChild(settingsDivider);
+
+    const settingsTitle = document.createElement('div');
+    settingsTitle.textContent = 'Settings';
+    settingsTitle.style.fontWeight = 'bold';
 
     const notifLabel = document.createElement('label');
     notifLabel.textContent = ' Enable Notifications';
@@ -138,19 +289,38 @@ function createSEClockMenu() {
     notifCheckbox.type = 'checkbox';
     notifCheckbox.id = 'notif-toggle';
 
+    settingsContainer.appendChild(settingsTitle);
     notifLabel.prepend(notifCheckbox);
-    menuBox.appendChild(notifLabel);
+    settingsContainer.appendChild(notifLabel);
 
     notifCheckbox.checked = localStorage.getItem('notifEnabled') === 'true';
 
     notifCheckbox.addEventListener('change', () => {
-      localStorage.setItem('notifEnabled', notifCheckbox.checked);
+        localStorage.setItem('notifEnabled', notifCheckbox.checked);
+        
+        soundToggle.textContent = notifCheckbox.checked ? '🔊' : '🔇';
+
     });
+    soundToggle.addEventListener('click', () => {
+        notifCheckbox.checked = !notifCheckbox.checked;
+        localStorage.setItem('notifEnabled', notifCheckbox.checked);
+        soundToggle.textContent = notifCheckbox.checked ? '🔊' : '🔇';
+
+        notifCheckbox.dispatchEvent(new Event('change'));
+    });
+    transparencyToggle.addEventListener('click', () => {
+        transparencyCheckbox.checked = !transparencyCheckbox.checked;
+        localStorage.setItem('transparencyDisabled', transparencyCheckbox.checked);
+        transparencyToggle.textContent = transparencyCheckbox.checked ? '◼' : '◻';
+        transparencyCheckbox.dispatchEvent(new Event('change'));
+    });
+
+
     const soundSelectLabel = document.createElement('label');
     soundSelectLabel.textContent = 'Select Sound:';
     soundSelectLabel.style.display = 'block';
     soundSelectLabel.style.marginTop = '10px';
-    menuBox.appendChild(soundSelectLabel);
+    settingsContainer.appendChild(soundSelectLabel);
 
     //SOUND SELECT IN MENU
 
@@ -162,7 +332,7 @@ function createSEClockMenu() {
         opt.textContent = name;
         soundSelect.appendChild(opt);
     });
-    menuBox.appendChild(soundSelect);
+    settingsContainer.appendChild(soundSelect);
 
     const customSoundWrapper = document.createElement('div');
     customSoundWrapper.style.display = 'flex';
@@ -185,22 +355,21 @@ function createSEClockMenu() {
     clearSoundBtn.title = 'Remove custom sound';
     clearSoundBtn.style.padding = '4px 8px';
     clearSoundBtn.style.cursor = 'pointer';
-    clearSoundBtn.style.border = '1px solid #888';
-    clearSoundBtn.style.background = '#eee';
+
     clearSoundBtn.style.borderRadius = '4px';
 
     customSoundWrapper.appendChild(customSoundLabel);
     customSoundWrapper.appendChild(customSoundInput);
     customSoundWrapper.appendChild(clearSoundBtn);
-    menuBox.appendChild(customSoundWrapper);
+    settingsContainer.appendChild(customSoundWrapper);
 
     //GCP IN MENU
 
     const settingsDivider2 = document.createElement('hr');
-    menuBox.appendChild(settingsDivider2);
+    settingsContainer.appendChild(settingsDivider2);
 
     const GCPLabel = document.createElement('label');
-    GCPLabel.textContent = ' Enable GCP dot (refresh for change)';
+    GCPLabel.textContent = ' Enable GCP dot*';
     GCPLabel.style.display = 'block';
     GCPLabel.style.marginTop = '10px';
 
@@ -209,20 +378,116 @@ function createSEClockMenu() {
     GCPCheckbox.id = 'GCP-toggle';
 
     GCPLabel.prepend(GCPCheckbox);
-    menuBox.appendChild(GCPLabel);
+    settingsContainer.appendChild(GCPLabel);
 
     GCPCheckbox.checked = localStorage.getItem('GCPEnabled') === 'true';
 
     GCPCheckbox.addEventListener('change', () => {
-      localStorage.setItem('GCPEnabled', GCPCheckbox.checked);
+        localStorage.setItem('GCPEnabled', GCPCheckbox.checked);
+        
+        gcpToggle.textContent = GCPCheckbox.checked ? '🟢' : '🔴';
+        
     });
+    gcpToggle.addEventListener('click', () => {
+        GCPCheckbox.checked = !GCPCheckbox.checked;
+        localStorage.setItem('GCPEnabled', GCPCheckbox.checked);
+        gcpToggle.textContent = GCPCheckbox.checked ? '🟢' : '🔴';
+       
+        GCPCheckbox.dispatchEvent(new Event('change'));
+    });
+
+    const transparencyLabel = document.createElement('label');
+    transparencyLabel.textContent = ' Use basic theme and disable effects';
+    transparencyLabel.style.display = 'block';
+    transparencyLabel.style.marginTop = '10px';
+
+    const transparencyCheckbox = document.createElement('input');
+    transparencyCheckbox.type = 'checkbox';
+    transparencyCheckbox.id = 'transparency-toggle';
+
+    transparencyLabel.prepend(transparencyCheckbox);
+    settingsContainer.appendChild(transparencyLabel);
+
+    transparencyCheckbox.checked = localStorage.getItem('transparencyDisabled') === 'true';
+    updateTransparencyEffects(); 
+
+    transparencyCheckbox.addEventListener('change', () => {
+        localStorage.setItem('transparencyDisabled', transparencyCheckbox.checked);
+        updateTransparencyEffects();
+        document.dispatchEvent(new CustomEvent('transparencyChanged', {
+            detail: { isTransparent: !transparencyCheckbox.checked }
+        }));
+    });
+    document.addEventListener('transparencyChanged', (e) => {
+        transparencyCheckbox.checked = !e.detail.isTransparent;
+        updateTransparencyEffects();
+    });
+
+    const rusearchModeLabel = document.createElement('label');
+    rusearchModeLabel.textContent = ' Simplify Soybooru Search features';
+    rusearchModeLabel.style.display = 'block';
+    rusearchModeLabel.style.marginTop = '10px';
+
+    const rusearchModeCheckbox = document.createElement('input');
+    rusearchModeCheckbox.type = 'checkbox';
+    rusearchModeCheckbox.id = 'searchmode-toggle';
+
+    rusearchModeLabel.prepend(rusearchModeCheckbox);
+    settingsContainer.appendChild(rusearchModeLabel);
+
+    rusearchModeCheckbox.checked = localStorage.getItem('soybooruDirectSearch') === 'true';
+
+    rusearchModeCheckbox.addEventListener('change', () => {
+        localStorage.setItem('soybooruDirectSearch', rusearchModeCheckbox.checked);
+
+        searchmodeToggle.textContent = rusearchModeCheckbox.checked ? '🌐' : '🔍';
+
+    });
+    searchmodeToggle.addEventListener('click', () => {
+        rusearchModeCheckbox.checked = !rusearchModeCheckbox.checked;
+        localStorage.setItem('soybooruDirectSearch', rusearchModeCheckbox.checked);
+        searchmodeToggle.textContent = rusearchModeCheckbox.checked ? '🌐' : '🔍';
+
+        rusearchModeCheckbox.dispatchEvent(new Event('change'));
+    });
+    function updateTransparencyEffects() {
+        const isDisabled = transparencyCheckbox.checked;
+
+        if (isDisabled) {
+
+            menuBox.style.backdropFilter = 'none';
+            menuBox.style.WebkitBackdropFilter = 'none';
+            menuBox.style.backgroundColor = '#ffffff';
+            menuBox.style.fontFamily = 'monospace';
+            menuBox.style.color = '#000000';
+
+            document.querySelectorAll('#spe-extension button').forEach(btn => {
+                btn.style.backdropFilter = 'none';
+                btn.style.backgroundColor = '#f0f0f0';
+                btn.style.fontFamily = 'monospace';
+                btn.style.color = '#000000';
+            });
+        } else {
+            menuBox.style.backdropFilter = 'blur(20px)';
+            menuBox.style.WebkitBackdropFilter = 'blur(10px)';
+            menuBox.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+            menuBox.style.fontFamily = '';
+            menuBox.style.color = '';
+
+            document.querySelectorAll('#spe-extension button').forEach(btn => {
+                btn.style.backdropFilter = 'blur(20px)';
+                btn.style.backgroundColor = 'rgba(255, 255, 255, 0.4)';
+                btn.style.fontFamily = '';
+                btn.style.color = '';
+            });
+        }
+    }
 
     //CUSTOM BACKGROUND IN MENU
 
 
-
     const settingsDivider3 = document.createElement('hr');
-    menuBox.appendChild(settingsDivider3);
+    settingsContainer.appendChild(settingsDivider3);
 
     const customBGLabel = document.createElement('label');
     customBGLabel.textContent = 'Upload custom background:';
@@ -238,13 +503,14 @@ function createSEClockMenu() {
     clearBGBtn.title = 'Remove custom sound';
     clearBGBtn.style.padding = '4px 8px';
     clearBGBtn.style.cursor = 'pointer';
-    clearBGBtn.style.border = '1px solid #888';
-    clearBGBtn.style.background = '#eee';
+
     clearBGBtn.style.borderRadius = '4px';
 
-    menuBox.appendChild(customBGLabel);
-    menuBox.appendChild(customBGInput);
-    menuBox.appendChild(clearBGBtn);
+
+
+    settingsContainer.appendChild(customBGLabel);
+    settingsContainer.appendChild(customBGInput);
+    settingsContainer.appendChild(clearBGBtn);
 
     customBGInput.addEventListener('change', e => {
         const file = e.target.files[0];
@@ -275,7 +541,6 @@ function createSEClockMenu() {
         localStorage.removeItem('userBackground');
         alert('(You) removed a custom background. Reverted to default.');
     });
-
 
 
 
@@ -331,6 +596,126 @@ function createSEClockMenu() {
         }
     });
 
+    // USER-CUSTOM BOARD LINKS
+    const settingsDivider4 = document.createElement('hr');
+    settingsContainer.appendChild(settingsDivider4);
+
+    const customLinkLabel = document.createElement('label');
+    customLinkLabel.textContent = 'Add custom header boardlist link:';
+    customLinkLabel.style.display = 'block';
+    customLinkLabel.style.marginTop = '10px';
+    settingsContainer.appendChild(customLinkLabel);
+
+    const customLinkInput = document.createElement('input');
+    customLinkInput.type = 'text';
+    customLinkInput.placeholder = 'e.g. gem';
+    customLinkInput.style.width = '70%';
+    customLinkInput.style.marginRight = '5px';
+    settingsContainer.appendChild(customLinkInput);
+
+    const addLinkBtn = document.createElement('button');
+    addLinkBtn.textContent = 'Add';
+    addLinkBtn.style.padding = '4px 8px';
+    addLinkBtn.style.cursor = 'pointer';
+
+    addLinkBtn.style.borderRadius = '4px';
+    settingsContainer.appendChild(addLinkBtn);
+
+    const clearLinksBtn = document.createElement('button');
+    clearLinksBtn.textContent = '🗑️';
+    clearLinksBtn.title = 'Clear all custom links';
+    clearLinksBtn.style.marginLeft = '8px';
+    clearLinksBtn.style.padding = '4px 8px';
+    clearLinksBtn.style.cursor = 'pointer';
+
+    clearLinksBtn.style.borderRadius = '4px';
+    settingsContainer.appendChild(clearLinksBtn);
+
+    const updateBtn = document.createElement('button');
+    updateBtn.textContent = 'Updates and About SPE';
+    updateBtn.title = 'Check for new versions';
+    updateBtn.style.padding = '4px 8px';
+    updateBtn.style.cursor = 'pointer';
+    updateBtn.style.borderRadius = '4px';
+    updateBtn.style.fontSize = '14px';
+    updateBtn.style.marginTop = '10px';
+
+    menuBox.appendChild(updateBtn);
+
+
+    updateBtn.addEventListener('click', () => {
+        updatePopup.style.display = 'block';
+    });
+
+
+    // FUNCTIONS OF FEATURES IN SETTINGS
+
+
+    function renderCustomLinks() {
+        const boardList = document.querySelector('.boardlist');
+        if (!boardList) return;
+
+        boardList.querySelectorAll('.custom-boardlink').forEach(el => el.remove());
+
+        const saved = JSON.parse(localStorage.getItem('customBoardLinks') || '[]');
+        if (saved.length === 0) return;
+
+        const customSpan = document.createElement('span');
+        customSpan.className = 'sub custom-boardlink';
+        customSpan.innerHTML = '[ ' + saved.map(board => `<a href="https://www.soyjak.st/${board}" title="Custom board">${board}</a>`).join(' / ') + ' ]';
+        
+
+        const searchwiki = document.createElement("input");
+        searchwiki.type = "text";
+        searchwiki.placeholder = "Soyjak Wiki search...";
+        searchwiki.style.width = "120px";
+        searchwiki.style.padding = "2px";
+        searchwiki.style.fontSize = "10px"
+
+        boardList.appendChild(customSpan);
+        boardList.appendChild(searchwiki);
+
+        searchwiki.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+                const query = searchwiki.value.trim();
+                if (query) {
+
+                    const url = "https://soyjakwiki.org/index.php?search=" + encodeURIComponent(query);
+
+
+                    window.open(url, "_blank");
+                }
+            }
+        });
+    }
+
+    addLinkBtn.addEventListener('click', () => {
+        const val = customLinkInput.value.trim();
+        if (!val || /[^a-z0-9]/i.test(val)) {
+            alert('Invalid board name.');
+            return;
+        }
+        const saved = JSON.parse(localStorage.getItem('customBoardLinks') || '[]');
+        if (!saved.includes(val)) {
+            saved.push(val);
+            localStorage.setItem('customBoardLinks', JSON.stringify(saved));
+            renderCustomLinks();
+            customLinkInput.value = '';
+        }
+    });
+
+    clearLinksBtn.addEventListener('click', () => {
+        if (confirm('Do you really want to remove your custom links saar?')) {
+            localStorage.removeItem('customBoardLinks');
+            renderCustomLinks();
+        }
+    });
+
+
+
+    renderCustomLinks();
+
+
 
     document.body.appendChild(menuBox);
 
@@ -345,11 +730,16 @@ function createSEClockMenu() {
     });
 
 
+
+
     toggleBtn.addEventListener('click', () => {
-        const visible = menuBox.style.display === 'block';
-        menuBox.style.display = visible ? 'none' : 'block';
-        toggleBtn.textContent = visible ? 'Show SPE Menu' : 'Hide SPE Menu';
+        const isOpening = menuBox.style.display === 'none';
+        menuBox.style.display = isOpening ? 'block' : 'none';
+        toggleBtn.textContent = visible ? '▼ SPE Menu' : '▲ SPE Menu';
+
+        
     });
+
 
     function updateClocks() {
         TIMEZONES.forEach(({ zone, clockId, statusId }) => {
@@ -372,11 +762,27 @@ function createSEClockMenu() {
     const refreshNote = document.createElement('div');
     refreshNote.textContent = 'Some changes can require a refresh to fully apply o algx';
     refreshNote.style.fontSize = '11px';
-    refreshNote.style.color = '#888';
+
     refreshNote.style.marginTop = '10px';
     refreshNote.style.fontStyle = 'italic';
 
-    menuBox.appendChild(refreshNote);
+    expandBtn.addEventListener('click', () => {
+        const isHidden = settingsContainer.style.display === 'none';
+        settingsContainer.style.display = isHidden ? 'block' : 'none';
+        expandBtn.textContent = isHidden ? '▲ Collapse Settings ⚙' : '▼ Expand Settings ⚙';
+    });
+
+    settingsContainer.appendChild(refreshNote);
+    menuBox.appendChild(clocksSection);
+    menuBox.appendChild(expandBtn);
+    menuBox.appendChild(settingsContainer);
+
+    applyActiveTheme(extensionHost);
+
+    new MutationObserver(() => applyActiveTheme(extensionHost))
+        .observe(document.head, { childList: true });
+
+
 }
 
 createSEClockMenu();
@@ -411,51 +817,546 @@ capcodes.forEach(capcode => {
   }
 });
 
-// NOTIFICATION
 
-let lastCount = 0;
-let userInteracted = false;
+// quotey quotes
+const enhancedButtons = new WeakSet();
 
-['click', 'keydown', 'scroll'].forEach(evt =>
-  window.addEventListener(evt, () => userInteracted = true, { once: true })
-);
+const buttonConfigs = [
+    { type: 'default', symbol: '>', color: '#789922', title: 'Quote (>)' },
+    { type: 'angle', symbol: '<', color: '#f6750b', title: 'Quote (<)' },
+    { type: 'caret', symbol: '^', color: '#6f7de4', title: 'Quote (^)' },
+    { type: 'unquote', symbol: '×', color: '#ff6b6b', title: 'Remove quotes' }
+];
 
-function getTitleCount() {
-  const match = document.title.match(/^\((\d+)\)/);
-  return match ? parseInt(match[1], 10) : 0;
+function createSymbolButton(config) {
+    const button = document.createElement('a');
+    button.className = 'enhanced-quote';
+    button.href = 'javascript:void(0);';
+    button.title = config.title;
+    button.dataset.quoteType = config.type;
+    button.textContent = config.symbol;
+
+    button.style.color = config.color;
+    button.style.textDecoration = 'none';
+    button.style.fontWeight = 'normal';
+    button.style.padding = '0';
+    button.style.margin = '0';
+    button.style.background = 'none';
+    button.style.border = 'none';
+    button.style.cursor = 'pointer';
+
+    return button;
 }
 
-setInterval(() => {
-    const currentCount = getTitleCount();
-    const notifEnabled = localStorage.getItem('notifEnabled') === 'true';
+function createButtonGroup(originalButton) {
+    const group = document.createElement('span');
+    group.className = 'enhanced-quote-group';
+    group.style.marginLeft = '4px';
+    group.style.letterSpacing = '-0.05em';
+    buttonConfigs.forEach(config => {
+        const button = createSymbolButton(config);
+        button.addEventListener('click', handleQuoteClick);
+        group.appendChild(button);
 
-    if (
-        notifEnabled &&
-        currentCount > lastCount &&
-        userInteracted &&
-        document.hidden
-    ) {
-        audio.play().catch(e => {
-            
-        });
+        
+        if (config !== buttonConfigs[buttonConfigs.length - 1]) {
+            group.appendChild(document.createTextNode(' '));
+        }
+    });
+
+    return group;
+}
+function handleQuoteClick(event) {
+    event.preventDefault();
+    const button = event.currentTarget;
+
+    if (typeof jQuery !== 'undefined') {
+        jQuery(window).trigger('cite', [0, false]);
     }
 
-    lastCount = currentCount;
-}, 1000);
+    const post = button.closest('.post');
+    if (!post) return;
 
-// GCP DOT
+    const body = post.querySelector('.body');
+    if (!body) return;
+
+    let originalText = body.innerText;
+    let text = '';
+
+    switch (button.dataset.quoteType) {
+        case 'angle':
+            text = "<" + originalText.split("\n").join("\n<");
+            break;
+        case 'caret':
+            text = "^" + originalText.split("\n").join("\n^");
+            break;
+        case 'unquote':
+            text = originalText.replace(/^[><^\s]+/gm, '');
+            break;
+        default:
+            text = ">" + originalText.split("\n").join("\n>");
+    }
+
+    var textareas = document.getElementsByName("body");
+    var scrollX = window.scrollX || window.pageXOffset;
+    var scrollY = window.scrollY || window.pageYOffset;
+
+    for (var i = 0; i < textareas.length; i++) {
+        textareas[i].value = text;
+
+        if (i + 1 == textareas.length) {
+
+            if (typeof jQuery !== 'undefined') {
+                jQuery(textareas[i]).trigger('focus');
+            } else {
+                textareas[i].focus();
+            }
+        }
+    }
+
+
+    window.scrollTo(scrollX, scrollY);
+}
+
+
+function enhanceQuoteButton(originalButton) {
+    if (enhancedButtons.has(originalButton)) return;
+
+    try {
+        const buttonGroup = createButtonGroup(originalButton);
+        originalButton.replaceWith(buttonGroup);
+        enhancedButtons.add(originalButton);
+    } catch (error) {
+        console.error('Error enhancing button:', error);
+    }
+}
+
+let processing = false;
+function handleMutations() {
+    if (processing) return;
+    processing = true;
+
+    setTimeout(() => {
+        const quoteButtons = document.querySelectorAll('a.post_quote:not(.enhanced-quote)');
+        quoteButtons.forEach(enhanceQuoteButton);
+        processing = false;
+    }, 100);
+}
+
+function initExtension() {
+    const observer = new MutationObserver(handleMutations);
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+
+
+    handleMutations();
+}
+
+if (document.readyState === 'complete') {
+    initExtension();
+} else {
+    document.addEventListener('DOMContentLoaded', initExtension);
+}
+
 
 if (localStorage.getItem('GCPEnabled') === 'true') {
-  const iframe = document.createElement('iframe');
-  iframe.src = browser.runtime.getURL("gcpdot.html");
-  iframe.style.position = 'fixed';
-  iframe.style.top = '25px';
-  iframe.style.right = '5px';
-  iframe.style.width = '55px';
-  iframe.style.height = '55px';
-  iframe.style.zIndex = '10000';
-  iframe.style.border = 'none';
-  iframe.style.borderRadius = '8px';
+    const iframe = document.createElement('iframe');
+    iframe.src = browser.runtime.getURL("gcpdot.html");
+    iframe.style.position = 'fixed';
+    iframe.style.top = '25px';
+    iframe.style.left = '5px';
+    iframe.style.width = '55px';
+    iframe.style.height = '55px';
+    iframe.style.zIndex = '10000';
+    iframe.style.border = 'none';
+    iframe.style.borderRadius = '8px';
 
-  document.body.appendChild(iframe);
+    document.body.appendChild(iframe);
 }
+
+window.addEventListener('storage', (event) => {
+    if (event.key === 'transparencyDisabled') {
+        if (typeof updateTransparencyEffects !== 'undefined') {
+            updateTransparencyEffects();
+        }
+        if (typeof updateAllTransparencyEffects !== 'undefined') {
+            updateAllTransparencyEffects();
+        }
+    }
+});
+
+
+
+// Update handling section
+
+const updatePopup = document.createElement('div');
+updatePopup.style.position = 'fixed';
+updatePopup.style.top = '50%';
+updatePopup.style.left = '50%';
+updatePopup.style.transform = 'translate(-50%, -50%)';
+updatePopup.style.zIndex = '100000';
+updatePopup.style.background = 'white';
+updatePopup.style.padding = '30px';
+updatePopup.style.borderRadius = '10px';
+updatePopup.style.boxShadow = '0 0 16px rgba(0,0,0,0.4)';
+updatePopup.style.minWidth = '600px';
+updatePopup.style.fontSize = '14px';
+updatePopup.style.display = 'none';
+updatePopup.style.textAlign = 'left'; // You can modify this later
+updatePopup.style.fontFamily = 'sans-serif';
+updatePopup.style.maxWidth = '120vw';
+updatePopup.style.maxHeight = '100vh';
+updatePopup.style.overflowY = 'auto';
+updatePopup.style.backdropFilter = 'blur(20px)';
+updatePopup.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+updatePopup.style.WebkitBackdropFilter = 'blur(10px)';
+
+const titleEl = document.createElement('h2');
+titleEl.textContent = 'Soyjak Party Enhanced';
+titleEl.style.marginTop = '0';
+titleEl.style.fontSize = '28px';
+titleEl.style.fontWeight = 'bold';
+titleEl.style.marginBottom = '12px';
+titleEl.style.textAlign = 'left';
+
+const udiv = document.createElement('hr');
+
+const versionEl = document.createElement('div');
+versionEl.textContent = `Current version: ${browser.runtime.getManifest().version}`;
+versionEl.style.marginBottom = '10px';
+
+const checkBtn = document.createElement('button');
+checkBtn.textContent = 'Check for updates';
+checkBtn.style.marginTop = '10px';
+checkBtn.style.padding = '6px 10px';
+checkBtn.style.borderRadius = '4px';
+checkBtn.disabled = false;
+checkBtn.style.cursor = 'pointer';
+checkBtn.title = 'Click to check for updates';
+
+checkBtn.addEventListener('click', async () => {
+    checkForUpdates();
+});
+
+const githubLink = document.createElement('a');
+githubLink.href = 'https://github.com/extteen/soyjakparty-enhanced';
+githubLink.target = '_blank';
+githubLink.textContent = 'GitHub Repo';
+githubLink.style.display = 'block';
+githubLink.style.marginTop = '10px';
+
+const changelogLink = document.createElement('a');
+changelogLink.href = 'https://github.com/extteen/soyjakparty-enhanced/releases';
+changelogLink.target = '_blank';
+changelogLink.textContent = 'Changelog';
+changelogLink.style.display = 'block';
+
+const closeBtn = document.createElement('button');
+closeBtn.textContent = '✖ Close';
+closeBtn.style.marginTop = '20px';
+closeBtn.style.padding = '6px 10px';
+closeBtn.style.cursor = 'pointer';
+closeBtn.style.borderRadius = '4px';
+
+const debuglink = document.createElement('a');
+debuglink.href = '#';
+debuglink.textContent = 'Debug Menu';
+debuglink.style.display = 'block';
+debuglink.style.fontSize = '12px';
+debuglink.style.marginTop = '8px';
+debuglink.addEventListener('click', (e) => {
+    e.preventDefault();
+    debugMenu.style.display = debugMenu.style.display === 'none' ? 'block' : 'none';
+});
+
+updatePopup.appendChild(titleEl);
+updatePopup.appendChild(udiv);
+updatePopup.appendChild(versionEl);
+updatePopup.appendChild(checkBtn);
+updatePopup.appendChild(githubLink);
+updatePopup.appendChild(changelogLink);
+updatePopup.appendChild(closeBtn);
+updatePopup.appendChild(debuglink);
+document.body.appendChild(updatePopup);
+
+closeBtn.addEventListener('click', () => {
+    updatePopup.style.display = 'none';
+});
+
+const GITHUB_REPO = "extteen/soyjakparty-enhanced";
+
+function normalizeVersionTag(tag) {
+    if (!tag) return "";
+    return String(tag).replace(/^pr[-_]?v?/i, '').replace(/^v/i, '').trim();
+}
+
+const canProgrammaticUpdate =
+    typeof browser?.runtime?.requestUpdateCheck === 'function' ||
+    typeof chrome?.runtime?.requestUpdateCheck === 'function';
+
+const updateActionSection = document.createElement('div');
+updateActionSection.style.display = 'none';
+updateActionSection.style.marginTop = '12px';
+updateActionSection.style.paddingTop = '10px';
+updateActionSection.style.borderTop = '1px solid rgba(0,0,0,0.08)';
+updateActionSection.style.textAlign = 'center';
+
+const updateMessage = document.createElement('div');
+updateMessage.style.fontWeight = '600';
+updateMessage.style.marginBottom = '8px';
+updateActionSection.appendChild(updateMessage);
+
+const doUpdateBtn = document.createElement('button');
+doUpdateBtn.textContent = 'Update Now';
+doUpdateBtn.style.padding = '6px 10px';
+doUpdateBtn.style.borderRadius = '6px';
+doUpdateBtn.style.marginRight = '8px';
+doUpdateBtn.style.cursor = 'pointer';
+
+const openReleaseBtn = document.createElement('button');
+openReleaseBtn.textContent = 'Open Release';
+openReleaseBtn.style.padding = '6px 10px';
+openReleaseBtn.style.borderRadius = '6px';
+openReleaseBtn.style.cursor = 'pointer';
+
+updateActionSection.appendChild(doUpdateBtn);
+updateActionSection.appendChild(openReleaseBtn);
+
+updatePopup.appendChild(updateActionSection);
+
+if (!canProgrammaticUpdate) {
+    doUpdateBtn.disabled = true;
+    doUpdateBtn.style.opacity = '0.45';
+    doUpdateBtn.title = 'Programmatic update not supported in this environment';
+} else {
+    doUpdateBtn.title = 'Attempt programmatic update (if supported)';
+}
+
+async function fetchNewestReleaseFromGitHub(repo) {
+    const url = `https://api.github.com/repos/${repo}/releases`;
+    const res = await fetch(url, { headers: { Accept: 'application/vnd.github.v3+json' } });
+    if (!res.ok) throw new Error(`GitHub API error ${res.status}`);
+    const releases = await res.json();
+    if (!Array.isArray(releases) || releases.length === 0) return null;
+    releases.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+    return releases[0]; // newest by published_at
+}
+
+function showAutoNotification(version, releaseUrl) {
+    const existing = document.getElementById('spe-update-modal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'spe-update-modal';
+    modal.style.position = 'fixed';
+    modal.style.left = '50%';
+    modal.style.top = '20%';
+    modal.style.transform = 'translateX(-50%)';
+    modal.style.background = 'white';
+    modal.style.padding = '18px';
+    modal.style.borderRadius = '10px';
+    modal.style.boxShadow = '0 8px 30px rgba(0,0,0,0.25)';
+    modal.style.zIndex = 200000;
+    modal.style.minWidth = '320px';
+    modal.style.textAlign = 'center';
+    modal.style.fontFamily = 'sans-serif';
+
+    const msg = document.createElement('div');
+    msg.innerHTML = `A new update for SPE is available: <strong>${version}</strong>`;
+    msg.style.marginBottom = '12px';
+    modal.appendChild(msg);
+
+    const btnRow = document.createElement('div');
+    btnRow.style.display = 'flex';
+    btnRow.style.justifyContent = 'center';
+    btnRow.style.gap = '8px';
+
+    const remindBtn = document.createElement('button');
+    remindBtn.textContent = 'Remind later';
+    remindBtn.style.padding = '6px 10px';
+    remindBtn.style.borderRadius = '6px';
+    remindBtn.style.cursor = 'pointer';
+
+    const ignoreBtn = document.createElement('button');
+    ignoreBtn.textContent = 'Ignore';
+    ignoreBtn.style.padding = '6px 10px';
+    ignoreBtn.style.borderRadius = '6px';
+    ignoreBtn.style.cursor = 'pointer';
+
+    const openBtn = document.createElement('button');
+    openBtn.textContent = 'Open release';
+    openBtn.style.padding = '6px 10px';
+    openBtn.style.borderRadius = '6px';
+    openBtn.style.cursor = 'pointer';
+
+    btnRow.appendChild(remindBtn);
+    btnRow.appendChild(ignoreBtn);
+    btnRow.appendChild(openBtn);
+
+    modal.appendChild(btnRow);
+    document.body.appendChild(modal);
+
+    remindBtn.addEventListener('click', async () => {
+        const untilDate = new Date();
+        untilDate.setDate(untilDate.getDate() + 1);
+        const untilStr = untilDate.toISOString().slice(0, 10);
+        await browser.storage.local.set({ snoozedVersion: { version: version, until: untilStr } });
+        modal.remove();
+    });
+
+    ignoreBtn.addEventListener('click', async () => {
+        const st = await browser.storage.local.get('ignoredVersions');
+        const arr = Array.isArray(st.ignoredVersions) ? st.ignoredVersions : [];
+        if (!arr.includes(version)) arr.push(version);
+        await browser.storage.local.set({ ignoredVersions: arr });
+        modal.remove();
+    });
+
+    openBtn.addEventListener('click', () => {
+        window.open(releaseUrl, '_blank');
+        modal.remove();
+    });
+}
+async function checkAndHandleUpdate({ auto = false } = {}) {
+    const currentVersion = browser.runtime.getManifest().version;
+    let newest;
+    try {
+        newest = await fetchNewestReleaseFromGitHub(GITHUB_REPO);
+        if (!newest) {
+            return { found: false };
+        }
+    } catch (err) {
+        console.error('Update check failed:', err);
+        const errEl = document.createElement('div');
+        errEl.textContent = err.message;
+        errEl.style.color = 'orange';
+        errEl.style.marginTop = '10px';
+        updatePopup.appendChild(errEl);
+        return { found: false, error: err };
+    }
+
+    const latestTag = newest.tag_name || '';
+    const latestNorm = normalizeVersionTag(latestTag);
+    const currentNorm = normalizeVersionTag(currentVersion);
+
+    if (latestNorm !== currentNorm) {
+        const st = await browser.storage.local.get(['ignoredVersions', 'snoozedVersion']);
+        const ignored = Array.isArray(st.ignoredVersions) ? st.ignoredVersions : [];
+        const snoozed = st.snoozedVersion || null;
+        const todayStr = new Date().toISOString().slice(0, 10);
+
+        updateActionSection.style.display = 'block';
+        updateMessage.textContent = `New version: ${latestTag}`;
+
+        openReleaseBtn.onclick = () => window.open(newest.html_url, '_blank');
+
+        if (canProgrammaticUpdate) {
+            doUpdateBtn.disabled = false;
+            doUpdateBtn.style.opacity = '1.0';
+            doUpdateBtn.onclick = async () => {
+                try {
+                    const fn = browser?.runtime?.requestUpdateCheck || chrome?.runtime?.requestUpdateCheck;
+                    if (typeof fn === 'function') {
+                        fn((status) => {
+                            console.log('requestUpdateCheck status:', status);
+                            alert('Update check requested. See console for status. If update did not install, open the release page.');
+                        });
+                    } else {
+                        alert('Automatic update not supported in this browser. Open the release page to update manually.');
+                        window.open(newest.html_url, '_blank');
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert('Update attempt failed opening release page.');
+                    window.open(newest.html_url, '_blank');
+                }
+            };
+        } else {
+            doUpdateBtn.disabled = true;
+            doUpdateBtn.style.opacity = '0.45';
+            doUpdateBtn.onclick = null;
+        }
+
+        let shouldNotify = auto;
+        if (shouldNotify) {
+            if (ignored.includes(latestTag) || ignored.includes(latestNorm)) shouldNotify = false;
+            if (snoozed && snoozed.version === latestTag) {
+                const until = snoozed.until || '';
+                if (until >= todayStr) shouldNotify = false; // still snoozed
+            }
+        }
+
+        if (shouldNotify) {
+            showAutoNotification(latestTag, newest.html_url);
+        }
+
+        return { found: true, latest: newest };
+    } else {
+        updateActionSection.style.display = 'none';
+        return { found: false };
+    }
+}
+checkBtn.disabled = false;
+checkBtn.style.cursor = 'pointer';
+checkBtn.title = 'Click to check for updates';
+
+checkBtn.addEventListener('click', async () => {
+    await checkAndHandleUpdate({ auto: false });
+});
+
+async function autoCheckOncePerDay() {
+    const today = new Date().toISOString().slice(0, 10);
+    const st = await browser.storage.local.get('lastCheckDate');
+    if (st.lastCheckDate !== today) {
+        await browser.storage.local.set({ lastCheckDate: today });
+        await checkAndHandleUpdate({ auto: true });
+    } else {
+
+    }
+}
+
+autoCheckOncePerDay();
+
+//debug tools
+
+const debugMenu = document.createElement('div');
+debugMenu.style.display = 'none';
+debugMenu.style.position = 'fixed';
+debugMenu.style.bottom = '10px';
+debugMenu.style.right = '10px';
+debugMenu.style.background = '#fff';
+debugMenu.style.border = '1px solid #ccc';
+debugMenu.style.padding = '8px';
+debugMenu.style.fontSize = '12px';
+debugMenu.style.zIndex = '100001';
+
+const debugTitle = document.createElement('div');
+debugTitle.textContent = 'Debug Menu';
+debugTitle.style.fontWeight = 'bold';
+debugTitle.style.marginBottom = '6px';
+debugMenu.appendChild(debugTitle);
+
+const clearAllDataLink = document.createElement('a');
+clearAllDataLink.href = '#';
+clearAllDataLink.textContent = 'Delete all extension data';
+clearAllDataLink.style.display = 'block';
+clearAllDataLink.addEventListener('click', async (e) => {
+    e.preventDefault();
+    await browser.storage.local.clear();
+    localStorage.clear();
+    alert('Your settings and data have been cleared or something');
+});
+debugMenu.appendChild(clearAllDataLink);
+const clearCheckDateLink = document.createElement('a');
+clearCheckDateLink.href = '#';
+clearCheckDateLink.textContent = 'Reset daily update check';
+clearCheckDateLink.style.display = 'block';
+clearCheckDateLink.addEventListener('click', async (e) => {
+    e.preventDefault();
+    await browser.storage.local.remove('lastCheckDate');
+    alert('Last check date cleared (SNCA)');
+});
+debugMenu.appendChild(clearCheckDateLink);
+document.body.appendChild(debugMenu);

@@ -21,6 +21,7 @@
 
         const container = document.createElement('div');
         container.style.display = 'flex';
+        container.style.zIndex = '1';
         container.style.flexDirection = 'column';
         container.style.alignItems = 'center';
         container.style.marginTop = '10px';
@@ -144,7 +145,7 @@
                 border: none;
                 box-shadow: none;
                 padding: 0;
-                z-index: 20000;
+                z-index: 1;
                 display: flex;
                 flex-direction: column;
                 align-items: flex-end;
@@ -228,3 +229,4 @@
         
     }
 })();
+
