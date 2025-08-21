@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Soyjak Party Enhanced",
-  "version": "2.0",
+  "version": "3.0.0",
   "description": "Enhances the Soyjak.Party experience or something",
   "permissions": [
     "storage",
@@ -35,6 +35,7 @@
   "content_scripts": [
     {
       "matches": [
+        "*://www.soyjak.party/*",
         "*://www.soyjak.st/*",
         "*://soybooru.com/*",
         "*://soyjakwiki.org/*"

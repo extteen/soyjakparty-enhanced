@@ -176,8 +176,6 @@ function createSEClockMenu() {
     soundToggle.textContent = localStorage.getItem('notifEnabled') === 'true' ? '🔊' : '🔇';
     soundToggle.title = 'Toggle notification sounds';
     soundToggle.style.padding = '4px 8px';
-
-
     soundToggle.style.borderRadius = '4px';
     soundToggle.style.cursor = 'pointer';
     soundToggle.style.fontSize = '14px';
@@ -186,8 +184,6 @@ function createSEClockMenu() {
     gcpToggle.textContent = localStorage.getItem('GCPEnabled') === 'true' ? '🟢' : '🔴';
     gcpToggle.title = 'Toggle GCP dot';
     gcpToggle.style.padding = '4px 8px';
-
-
     gcpToggle.style.borderRadius = '4px';
     gcpToggle.style.cursor = 'pointer';
     gcpToggle.style.fontSize = '14px';
@@ -210,6 +206,15 @@ function createSEClockMenu() {
     searchmodeToggle.style.cursor = 'pointer';
     searchmodeToggle.style.fontSize = '14px';
     searchmodeToggle.style.marginLeft = '8px';
+
+    const textpreviewToggle = document.createElement('button');
+    textpreviewToggle.textContent = localStorage.getItem('noPreviewText') === 'true' ? '❔' : '❓';
+    textpreviewToggle.title = 'Toggle text previewing feature';
+    textpreviewToggle.style.padding = '4px 8px';
+    textpreviewToggle.style.borderRadius = '4px';
+    textpreviewToggle.style.cursor = 'pointer';
+    textpreviewToggle.style.fontSize = '14px';
+    textpreviewToggle.style.marginLeft = '8px';
 
     clocksHeader.appendChild(clocksTitle);
     
@@ -269,6 +274,7 @@ function createSEClockMenu() {
     topControls.appendChild(gcpToggle);
     topControls.appendChild(transparencyToggle);
     topControls.appendChild(searchmodeToggle);
+    topControls.appendChild(textpreviewToggle);
 
     const settingsDivider = document.createElement('hr');
     settingsDivider.style.marginTop = '10px';
@@ -314,6 +320,7 @@ function createSEClockMenu() {
         transparencyToggle.textContent = transparencyCheckbox.checked ? '◼' : '◻';
         transparencyCheckbox.dispatchEvent(new Event('change'));
     });
+
 
 
     const soundSelectLabel = document.createElement('label');
@@ -450,6 +457,36 @@ function createSEClockMenu() {
 
         rusearchModeCheckbox.dispatchEvent(new Event('change'));
     });
+
+
+    const textpreviewLabel = document.createElement('label');
+    textpreviewLabel.textContent = ' Disable text format previewing';
+    textpreviewLabel.style.display = 'block';
+    textpreviewLabel.style.marginTop = '10px';
+
+    const textpreviewCheckbox = document.createElement('input');
+    textpreviewCheckbox.type = 'checkbox';
+    textpreviewCheckbox.id = 'preview-toggle';
+
+    textpreviewLabel.prepend(textpreviewCheckbox);
+    settingsContainer.appendChild(textpreviewLabel);
+
+    textpreviewCheckbox.checked = localStorage.getItem('noPreviewText') === 'true';
+
+    textpreviewCheckbox.addEventListener('change', () => {
+        localStorage.setItem('noPreviewText', textpreviewCheckbox.checked);
+
+        textpreviewToggle.textContent = textpreviewCheckbox.checked ? '❔' : '❓';
+
+    });
+    textpreviewToggle.addEventListener('click', () => {
+        textpreviewCheckbox.checked = !textpreviewCheckbox.checked;
+        localStorage.setItem('noPreviewText', textpreviewCheckbox.checked);
+        textpreviewToggle.textContent = textpreviewCheckbox.checked ? '❔' : '❓';
+
+        textpreviewCheckbox.dispatchEvent(new Event('change'));
+    });
+
     function updateTransparencyEffects() {
         const isDisabled = transparencyCheckbox.checked;
 
@@ -1141,7 +1178,7 @@ async function fetchNewestReleaseFromGitHub(repo) {
     const releases = await res.json();
     if (!Array.isArray(releases) || releases.length === 0) return null;
     releases.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
-    return releases[0]; // newest by published_at
+    return releases[0];
 }
 
 function showAutoNotification(version, releaseUrl) {
@@ -1261,15 +1298,15 @@ async function checkAndHandleUpdate({ auto = false } = {}) {
                     if (typeof fn === 'function') {
                         fn((status) => {
                             console.log('requestUpdateCheck status:', status);
-                            alert('Update check requested. See console for status. If update did not install, open the release page.');
+                            alert('Update check requested. If update did not install, open the release page.');
                         });
                     } else {
-                        alert('Automatic update not supported in this browser. Open the release page to update manually.');
+                        alert('Automatic update not supported in this browser BRAAAAP');
                         window.open(newest.html_url, '_blank');
                     }
                 } catch (e) {
                     console.error(e);
-                    alert('Update attempt failed opening release page.');
+                    alert('Update attempt FAILERALD');
                     window.open(newest.html_url, '_blank');
                 }
             };
@@ -1284,7 +1321,7 @@ async function checkAndHandleUpdate({ auto = false } = {}) {
             if (ignored.includes(latestTag) || ignored.includes(latestNorm)) shouldNotify = false;
             if (snoozed && snoozed.version === latestTag) {
                 const until = snoozed.until || '';
-                if (until >= todayStr) shouldNotify = false; // still snoozed
+                if (until >= todayStr) shouldNotify = false; 
             }
         }
 
@@ -1328,7 +1365,6 @@ debugMenu.style.bottom = '10px';
 debugMenu.style.right = '10px';
 debugMenu.style.background = '#fff';
 debugMenu.style.border = '1px solid #ccc';
-debugMenu.style.padding = '8px';
 debugMenu.style.fontSize = '12px';
 debugMenu.style.zIndex = '100001';
 
@@ -1340,7 +1376,7 @@ debugMenu.appendChild(debugTitle);
 
 const clearAllDataLink = document.createElement('a');
 clearAllDataLink.href = '#';
-clearAllDataLink.textContent = 'Delete all extension data';
+clearAllDataLink.textContent = 'Delete all site+extension data(excluding cookies)';
 clearAllDataLink.style.display = 'block';
 clearAllDataLink.addEventListener('click', async (e) => {
     e.preventDefault();

@@ -1437,9 +1437,15 @@ document.addEventListener('click', (e) => {
 
 (function () {
     'use strict';
+    if (localStorage.getItem('noPreviewText') === 'true') {
+        return;
+    }
 
     const textarea = document.querySelector('#body');
     if (!textarea) return;
+
+    textarea.style.minWidth = '420px';
+    textarea.style.minHeight = '120px';
 
     if (typeof soymojiFiles === 'undefined') {
         console.warn('soymojiFiles is not defined. Preview image replacement will be skipped.');
