@@ -2,7 +2,7 @@
 (function () {
     'use strict';
 
-    if (window.location.hostname === 'www.soyjak.st' && window.location.pathname === '/') {
+    if (window.location.hostname === 'soyjak.st' && window.location.pathname === '/') {
         createSoyspherePanel();
         removeSisterSites();
         addHappeningsLink()

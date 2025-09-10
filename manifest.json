@@ -10,7 +10,8 @@
   ],
   "host_permissions": [
     "*://soybooru.com/*",
-    "*://www.soyjak.st/*",
+    "*://*.soyjak.st/*",
+    "*://*.soyjak.party/*",
     "*://soyjakwiki.org/*"
   ],
   "action": {
@@ -27,7 +28,8 @@
     {
       "resources": [
         "icons/*",
-        "audio/*"
+        "audio/*",
+	"gcpdot.html"
       ],
       "matches": ["<all_urls>"]
     }
@@ -35,8 +37,8 @@
   "content_scripts": [
     {
       "matches": [
-        "*://www.soyjak.party/*",
-        "*://www.soyjak.st/*",
+        "*://*.soyjak.party/*",
+        "*://*.soyjak.st/*",
         "*://soybooru.com/*",
         "*://soyjakwiki.org/*"
       ],

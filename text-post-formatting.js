@@ -806,7 +806,7 @@ const soymojiFiles = [
     "a24.png", "ack.png", "amerimutt.png", "army.png", "army2.png","baby.png" ,"bernd.png", "chud.gif",
     "coal.png", "cob.png", "colorjak.png", "cry.png", "dancingswede.gif",
     "doctos.png", "euromutt.png", "fact.png", "feralrage.png", "feral_animated.gif",
-    "gem.png", "gigachad.png", "impish.png", "jacobson.png", "jew.png", "jig.gif",
+    "gem.png", "gigachad.png","htsm.png", "impish.png", "jacobson.png", "jew.png", "jig.gif",
     "med.gif", "microjaklover.png", "neutralplier.png", "nojak.png", "over.png",
     "pepe.png", "pepetux.png", "pepetwerk.gif", "perrojak.png", "posteditagain.png",
     "sisa.png", "slf.gif", "smug.png", "smugsoyak.png", "soot.png",
@@ -1349,7 +1349,7 @@ document.addEventListener('click', (event) => {
             const text = textbox.value;
             textbox.value = text.slice(0, start) + `[${shortcode}]` + text.slice(end);
             textbox.focus();
-
+            window.livePreview.updateCounter();
  
             textbox.selectionStart = textbox.selectionEnd = start + `[${shortcode}]`.length;
 
@@ -1402,7 +1402,7 @@ document.addEventListener('click', (event) => {
 
             textbox.selectionStart = textbox.selectionEnd = cursorPos;
             textbox.focus();
-
+            window.livePreview.updateCounter();
         } else {
            
         }
@@ -1435,136 +1435,162 @@ document.addEventListener('click', (e) => {
 
 // Text Previews from a random soyteen's modified userscript. thanks
 
-(function () {
-    'use strict';
-    if (localStorage.getItem('noPreviewText') === 'true') {
-        return;
+const DEFAULTS = {
+    lp_attach: 'true',
+    lp_enablePreview: 'true',
+    lp_enableCounter: 'false',
+    lp_forcePreviewText: 'false'
+};
+
+const flags = {
+    get(key) {
+        const v = localStorage.getItem(key);
+        return v === null ? DEFAULTS[key] : v;
+    },
+    set(key, value) {
+        localStorage.setItem(key, String(value));
     }
+};
 
-    const textarea = document.querySelector('#body');
-    if (!textarea) return;
+const ATTACH_ATTR = 'data-live-preview-attached';
 
-    textarea.style.minWidth = '420px';
-    textarea.style.minHeight = '120px';
+const state = {
+    textarea: null,
+    wrapper: null,
+    previewBox: null,
+    previewBtn: null,
+    resizeObserver: null,
+    soymojiAvailable: (typeof soymojiFiles !== 'undefined'),
+    codeToFile: {},
+    destroyed: false
+};
 
-    if (typeof soymojiFiles === 'undefined') {
-        console.warn('soymojiFiles is not defined. Preview image replacement will be skipped.');
-        return;
-    }
+function buildSoyMap() {
+    if (!state.soymojiAvailable) return;
     const soymojiBasePath = 'icons/soymoji';
-    const codeToFile = {};
+    state.codeToFile = {};
     soymojiFiles.forEach(fn => {
         if (typeof fn !== 'string') return;
         const name = fn.replace(/\.[^/.]+$/, '').toLowerCase();
-        if (!codeToFile[name]) codeToFile[name] = fn;
+        if (!state.codeToFile[name]) state.codeToFile[name] = fn;
     });
-    function extUrlFor(pathInsideExt) {
-        try {
-            if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function') {
-                return chrome.runtime.getURL(pathInsideExt);
-            }
-            if (typeof browser !== 'undefined' && browser.runtime && typeof browser.runtime.getURL === 'function') {
-                return browser.runtime.getURL(pathInsideExt);
-            }
-        } catch (e) {
-        }
-        return pathInsideExt;
-    }
-    if (codeToFile['baby'] && !codeToFile['babyjak']) codeToFile['babyjak'] = codeToFile['baby'];
-    if (codeToFile['slf'] && !codeToFile['selfish']) codeToFile['selfish'] = codeToFile['slf'];
+    if (state.codeToFile['baby'] && !state.codeToFile['babyjak']) state.codeToFile['babyjak'] = state.codeToFile['baby'];
+    if (state.codeToFile['slf'] && !state.codeToFile['selfish']) state.codeToFile['selfish'] = state.codeToFile['slf'];
+}
 
-    function soymojiImgHTML(codeRaw) {
-        const code = String(codeRaw).toLowerCase();
-        const file = codeToFile[code];
-        if (!file) return null;
-        const hEm = 1.2;
-        const src = extUrlFor(soymojiBasePath + '/' + file);
-        return `<img src="${src}" alt="[${codeRaw}]" title="${codeRaw}" decoding="async" 
+function extUrlFor(pathInsideExt) {
+    try {
+        if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function') {
+            return chrome.runtime.getURL(pathInsideExt);
+        }
+        if (typeof browser !== 'undefined' && browser.runtime && typeof browser.runtime.getURL === 'function') {
+            return browser.runtime.getURL(pathInsideExt);
+        }
+    } catch (e) {  }
+    return pathInsideExt;
+}
+
+function soymojiImgHTML(codeRaw) {
+    if (!state.soymojiAvailable) return null;
+    const code = String(codeRaw).toLowerCase();
+    const file = state.codeToFile[code];
+    if (!file) return null;
+    const src = extUrlFor('icons/soymoji/' + file);
+    return `<img src="${src}" alt="[${codeRaw}]" title="${codeRaw}" decoding="async"
             style="height:auto; width:auto; image-rendering:pixelated; display:inline; margin:0; padding:0;" />`;
-    }
-    function applyFormatting(text) {
-        const temp = document.createElement('div');
-        const lines = text.split('\n');
+}
 
-        for (let i = 0; i < lines.length; i++) {
-            let line = lines[i];
-            let span = document.createElement('span');
-            let arrowPrefix = '';
 
-            if (line.startsWith('>')) {
-                arrowPrefix = '>';
-                line = line.substring(1);
-                span.style.color = '#789922';
-            } else if (line.startsWith('<')) {
-                arrowPrefix = '<';
-                line = line.substring(1);
-                span.style.color = '#F6750B';
-            } else if (line.startsWith('^')) {
-                arrowPrefix = '^';
-                line = line.substring(1);
-                span.style.color = '#6577E6';
-            }
+function applyFormatting(text) {
+    const temp = document.createElement('div');
+    const lines = text.split('\n');
 
-            line = line.replace(/~-~(.*?)~-~/g, function (match, p1) {
-                let inner = p1;
-                inner = inner.replace(/==([^=]+)==/g, '<span style="font-weight:bold">$1</span>');
-                inner = inner.replace(/--([^-]+)--/g, '<span style="font-weight:bold">$1</span>');
-                inner = inner.replace(/-=([^-]+)-=/g, '<span style="font-weight:bold">$1</span>');
-                inner = inner.replace(/%%(.*?)%%/g, '<span style="text-shadow:0 0 5px #0f0">$1</span>');
-                inner = inner.replace(/::(.*?)::/g, '<span style="text-shadow:0 0 5px #ff0">$1</span>');
-                inner = inner.replace(/!!(.*?)!!/g, '<span style="text-shadow:0 0 5px #f00">$1</span>');
-                inner = inner.replace(/;;(.*?);;/g, '<span style="text-shadow:0 0 5px #0ff">$1</span>');
-                return `<span style="background:linear-gradient(90deg,violet,blue,cyan,green,yellow,orange,red);-webkit-background-clip:text;color:transparent;display:inline-block">${inner}</span>`;
-            });
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+        let span = document.createElement('span');
+        let arrowPrefix = '';
 
-            line = line.replace(/==([^=]+)==/g, '<span style="color:#AF0A0F;font-weight:bold">$1</span>');
-            line = line.replace(/--([^-]+)--/g, '<span style="color:#2424AD;font-weight:bold">$1</span>');
-            line = line.replace(/-=([^-]+)-=/g, '<span style="color:#720B98;font-weight:bold">$1</span>');
-
-            line = line.replace(/==\+=(.+?)=\+==/g, '<span style="color:#AF0A0F;font-weight:bold;font-size:115%">$1</span>');
-            line = line.replace(/--\+=(.+?)=\+--/g, '<span style="color:#2424AD;font-weight:bold;font-size:115%">$1</span>');
-            line = line.replace(/-=\+=(.+?)=\+-=/g, '<span style="color:#720B98;font-weight:bold;font-size:115%">$1</span>');
-
-            line = line.replace(/\+=([^+]+)=\+/g, '<span style="font-size:115%">$1</span>');
-            line = line.replace(/\(\(\(([^)]+)\)\)\)/g, '<span style="color:#3060A8;background:white">((($1)))</span>');
-            line = line.replace(/-~-([^-]+)-~-/g, '<span style="color:#FD3D98">$1</span>');
-
-            line = line.replace(/%%([^%]+)%%/g, '<span style="text-shadow:0 0 5px #0f0">$1</span>');
-            line = line.replace(/::([^:]+)::/g, '<span style="text-shadow:0 0 5px #ff0">$1</span>');
-            line = line.replace(/!!([^!]+)!!/g, '<span style="text-shadow:0 0 5px #f00">$1</span>');
-            line = line.replace(/;;([^;]+);;/g, '<span style="text-shadow:0 0 5px #0ff">$1</span>');
-
-            line = line.replace(/'''([^']+)'''/g, '<b>$1</b>');
-            line = line.replace(/''([^']+)''/g, '<i>$1</i>');
-            line = line.replace(/~~([^~]+)~~/g, '<s>$1</s>');
-            line = line.replace(/\*\*([^*]+)\*\*/g, '<span style="background:black;color:black" onmouseover="this.style.color=\'white\'" onmouseout="this.style.color=\'black\'">$1</span>');
-            line = line.replace(/__([^_]+)__/g, '<u>$1</u>');
-            line = line.replace(/```([^`]+)```/g, '<code>$1</code>');
-
-            line = line.replace(/\[([^\]]+)\]/g, function (match, p1) {
-                const img = soymojiImgHTML(p1);
-                return img ? img : `[${p1}]`;
-            });
-
-            if (arrowPrefix) {
-                const arrowSpan = document.createElement('span');
-                arrowSpan.textContent = arrowPrefix;
-                arrowSpan.style.color = span.style.color;
-                temp.appendChild(arrowSpan);
-            }
-
-            span.innerHTML = line || '&nbsp;';
-            temp.appendChild(span);
-            if (i < lines.length - 1) temp.appendChild(document.createElement('br'));
+        if (line.startsWith('>')) {
+            arrowPrefix = '>';
+            line = line.substring(1);
+            span.style.color = '#789922';
+        } else if (line.startsWith('<')) {
+            arrowPrefix = '<';
+            line = line.substring(1);
+            span.style.color = '#F6750B';
+        } else if (line.startsWith('^')) {
+            arrowPrefix = '^';
+            line = line.substring(1);
+            span.style.color = '#6577E6';
         }
 
-        return temp.innerHTML;
+        line = line.replace(/~-~(.*?)~-~/g, function (match, p1) {
+            let inner = p1;
+            inner = inner.replace(/==([^=]+)==/g, '<span style="font-weight:bold">$1</span>');
+            inner = inner.replace(/--([^-]+)--/g, '<span style="font-weight:bold">$1</span>');
+            inner = inner.replace(/-=([^-]+)-=/g, '<span style="font-weight:bold">$1</span>');
+            inner = inner.replace(/%%(.*?)%%/g, '<span style="text-shadow:0 0 5px #0f0">$1</span>');
+            inner = inner.replace(/::(.*?)::/g, '<span style="text-shadow:0 0 5px #ff0">$1</span>');
+            inner = inner.replace(/!!(.*?)!!/g, '<span style="text-shadow:0 0 5px #f00">$1</span>');
+            inner = inner.replace(/;;(.*?);;/g, '<span style="text-shadow:0 0 5px #0ff">$1</span>');
+            return `<span style="background:linear-gradient(90deg,violet,blue,cyan,green,yellow,orange,red);-webkit-background-clip:text;color:transparent;display:inline-block">${inner}</span>`;
+        });
+
+        line = line.replace(/==([^=]+)==/g, '<span style="color:#AF0A0F;font-weight:bold">$1</span>');
+        line = line.replace(/--([^-]+)--/g, '<span style="color:#2424AD;font-weight:bold">$1</span>');
+        line = line.replace(/-=([^-]+)-=/g, '<span style="color:#720B98;font-weight:bold">$1</span>');
+
+        line = line.replace(/==\+=(.+?)=\+==/g, '<span style="color:#AF0A0F;font-weight:bold;font-size:115%">$1</span>');
+        line = line.replace(/--\+=(.+?)=\+--/g, '<span style="color:#2424AD;font-weight:bold;font-size:115%">$1</span>');
+        line = line.replace(/-=\+=(.+?)=\+-=/g, '<span style="color:#720B98;font-weight:bold;font-size:115%">$1</span>');
+
+        line = line.replace(/\+=([^+]+)=\+/g, '<span style="font-size:115%">$1</span>');
+        line = line.replace(/\(\(\(([^)]+)\)\)\)/g, '<span style="color:#3060A8;background:white">((($1)))</span>');
+        line = line.replace(/-~-([^-]+)-~-/g, '<span style="color:#FD3D98">$1</span>');
+
+        line = line.replace(/%%([^%]+)%%/g, '<span style="text-shadow:0 0 5px #0f0">$1</span>');
+        line = line.replace(/::([^:]+)::/g, '<span style="text-shadow:0 0 5px #ff0">$1</span>');
+        line = line.replace(/!!([^!]+)!!/g, '<span style="text-shadow:0 0 5px #f00">$1</span>');
+        line = line.replace(/;;([^;]+);;/g, '<span style="text-shadow:0 0 5px #0ff">$1</span>');
+
+        line = line.replace(/'''([^']+)'''/g, '<b>$1</b>');
+        line = line.replace(/''([^']+)''/g, '<i>$1</i>');
+        line = line.replace(/~~([^~]+)~~/g, '<s>$1</s>');
+        line = line.replace(/\*\*([^*]+)\*\*/g, '<span style="background:black;color:black" onmouseover="this.style.color=\'white\'" onmouseout="this.style.color=\'black\'">$1</span>');
+        line = line.replace(/__([^_]+)__/g, '<u>$1</u>');
+        line = line.replace(/```([^`]+)```/g, '<code>$1</code>');
+
+        line = line.replace(/\[([^\]]+)\]/g, function (match, p1) {
+            const img = soymojiImgHTML(p1);
+            return img ? img : `[${p1}]`;
+        });
+
+        if (arrowPrefix) {
+            const arrowSpan = document.createElement('span');
+            arrowSpan.textContent = arrowPrefix;
+            arrowSpan.style.color = span.style.color;
+            temp.appendChild(arrowSpan);
+        }
+
+        span.innerHTML = line || '&nbsp;';
+        temp.appendChild(span);
+        if (i < lines.length - 1) temp.appendChild(document.createElement('br'));
     }
+
+    return temp.innerHTML;
+}
+
+function attachToTextarea(textarea) {
+    if (!textarea || textarea.hasAttribute(ATTACH_ATTR)) return null;
+
+    textarea.style.minWidth = '420px';
+    textarea.style.minHeight = '120px';
 
     const wrapper = document.createElement('div');
     wrapper.className = 'live-preview-wrapper';
     wrapper.style.position = 'relative';
     wrapper.style.display = 'inline-block';
+
     textarea.parentNode.replaceChild(wrapper, textarea);
     wrapper.appendChild(textarea);
 
@@ -1576,25 +1602,23 @@ document.addEventListener('click', (e) => {
     const previewBtn = document.createElement('button');
     previewBtn.id = 'preview-button';
     previewBtn.type = 'button';
-    previewBtn.innerText = 'Preview';
-    previewBtn.title = 'Hover to preview';
     previewBtn.tabIndex = 0;
+
     Object.assign(previewBtn.style, {
         position: 'absolute',
         right: '9px',
         bottom: '9px',
-        padding: '2px 4px',
+        padding: '2px 6px',
         borderRadius: '4px',
         border: '1px solid rgba(0,0,0,0.2)',
-        background: 'rgba(255,255,255,0.6)',
+        background: 'white', 
         backdropFilter: 'blur(4px)',
         cursor: 'pointer',
         zIndex: '32',
-        fontSize: '10px',
+        fontSize: '11px',
         color: '#222',
         boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
     });
-    wrapper.appendChild(previewBtn);
 
     const previewBox = document.createElement('div');
     previewBox.id = 'live-preview';
@@ -1604,7 +1628,7 @@ document.addEventListener('click', (e) => {
         left: '0',
         width: '100%',
         overflowY: 'auto',
-        background: 'rgba(255,255,255,0.9)',
+        background: 'rgba(255,255,255,0.95)',
         border: '1px solid #999',
         padding: '6px',
         boxShadow: '0 6px 18px rgba(0,0,0,0.1)',
@@ -1612,19 +1636,23 @@ document.addEventListener('click', (e) => {
         display: 'none',
         boxSizing: 'border-box'
     });
+
+    wrapper.appendChild(previewBtn);
     wrapper.appendChild(previewBox);
+
+    textarea.setAttribute(ATTACH_ATTR, 'true');
 
     function syncPreviewSize() {
         const h = textarea.offsetHeight;
         previewBox.style.height = h + 'px';
         previewBox.style.top = '0';
     }
-
     syncPreviewSize();
 
+    let ro;
     if (typeof ResizeObserver !== 'undefined') {
         try {
-            const ro = new ResizeObserver(syncPreviewSize);
+            ro = new ResizeObserver(syncPreviewSize);
             ro.observe(textarea);
             ro.observe(wrapper);
         } catch (e) {
@@ -1634,22 +1662,18 @@ document.addEventListener('click', (e) => {
         window.addEventListener('resize', syncPreviewSize);
     }
 
-    function showPreview() {
+    function showPreviewLocal() {
         syncPreviewSize();
         previewBox.style.display = 'block';
         renderPreview();
     }
-    function hidePreview() {
+    function hidePreviewLocal() {
         previewBox.style.display = 'none';
     }
-
-    previewBtn.addEventListener('mouseenter', showPreview);
-    previewBtn.addEventListener('focus', showPreview);
-
     previewBtn.addEventListener('mouseleave', function () {
         setTimeout(() => {
             if (!previewBtn.matches(':hover') && document.activeElement !== previewBtn) {
-                hidePreview();
+                hidePreviewLocal();
             }
         }, 50);
     });
@@ -1657,16 +1681,15 @@ document.addEventListener('click', (e) => {
     previewBtn.addEventListener('blur', function () {
         setTimeout(() => {
             if (!previewBtn.matches(':hover') && document.activeElement !== previewBtn) {
-                hidePreview();
+                hidePreviewLocal();
             }
         }, 50);
     });
 
-
     previewBox.tabIndex = -1;
     previewBox.addEventListener('keydown', function (ev) {
         if (ev.key === 'Escape') {
-            hidePreview();
+            hidePreviewLocal();
             previewBtn.focus();
         }
     });
@@ -1676,12 +1699,213 @@ document.addEventListener('click', (e) => {
         previewBox.innerHTML = text ? applyFormatting(text) : '<i>Text formatting preview...</i>';
     }
 
-    textarea.addEventListener('input', () => {
-        syncPreviewSize();
-        if (previewBox.style.display !== 'none') renderPreview();
+    return {
+        wrapper,
+        textarea,
+        previewBtn,
+        previewBox,
+        syncPreviewSize,
+        renderPreview,
+        resizeObserver: ro,
+        showPreview: showPreviewLocal,
+        hidePreview: hidePreviewLocal
+    };
+}
+
+function computeCounts(text) {
+    const chars = text.length;
+
+    const lines = text.length === 0 ? 0 : text.split('\n').length;
+    return { chars, lines };
+}
+
+function updateLabelFor(inst) {
+    if (!inst || !inst.previewBtn || !inst.textarea) return;
+    const enablePreview = flags.get('lp_enablePreview') === 'true';
+    const enableCounter = flags.get('lp_enableCounter') === 'true';
+    const forcePreviewText = flags.get('lp_forcePreviewText') === 'true';
+
+    const text = inst.textarea.value || '';
+    const { chars, lines } = computeCounts(text);
+
+    if (forcePreviewText) {
+        inst.previewBtn.textContent = 'Preview';
+    } else if (enableCounter && !enablePreview) {
+        inst.previewBtn.textContent = `${chars} | ${lines}`;
+    } else if (enableCounter && enablePreview) {
+        inst.previewBtn.textContent = `${chars} | ${lines}`;
+    } else {
+        inst.previewBtn.textContent = 'Preview';
+    }
+}
+
+function applyFeatureState(inst) {
+    if (!inst) return;
+
+    const enablePreview = flags.get('lp_enablePreview') === 'true';
+    const enableCounter = flags.get('lp_enableCounter') === 'true';
+
+    if (!enablePreview && !enableCounter) {
+        inst.previewBtn.style.display = 'none';
+        inst.previewBox.style.display = 'none';
+        return;
+    } else {
+        inst.previewBtn.style.display = '';
+    }
+
+    if (enableCounter && !enablePreview) {
+        inst.previewBtn.style.background = 'transparent';
+        inst.previewBtn.style.border = 'none';
+        inst.previewBtn.style.boxShadow = 'none';
+    } else {
+        inst.previewBtn.style.background = 'white';
+        inst.previewBtn.style.border = '1px solid rgba(0,0,0,0.2)';
+        inst.previewBtn.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
+    }
+
+    if (enablePreview) {
+        if (!inst._previewHandlersAttached) {
+            const handler = function () {
+                if (typeof inst.showPreview === 'function') inst.showPreview();
+                else {
+                    inst.syncPreviewSize();
+                    inst.previewBox.style.display = 'block';
+                    inst.renderPreview();
+                }
+            };
+            inst._previewHandlerFunc = handler;
+            inst.previewBtn.addEventListener('mouseenter', handler);
+            inst.previewBtn.addEventListener('focus', handler);
+            inst._previewHandlersAttached = true;
+        }
+    } else {
+        if (inst._previewHandlersAttached) {
+            try {
+                inst.previewBtn.removeEventListener('mouseenter', inst._previewHandlerFunc);
+                inst.previewBtn.removeEventListener('focus', inst._previewHandlerFunc);
+            } catch (e) { }
+            inst._previewHandlersAttached = false;
+            inst._previewHandlerFunc = null;
+        }
+        inst.previewBox.style.display = 'none';
+    }
+
+    updateLabelFor(inst);
+
+    if (!inst._inputHandlerAttached) {
+        const onInput = function () {
+            updateLabelFor(inst);
+            if (flags.get('lp_enablePreview') === 'true' && inst.previewBox.style.display !== 'none') {
+                inst.renderPreview();
+            }
+        };
+        inst.textarea.addEventListener('input', onInput);
+        inst._inputHandlerAttached = true;
+        inst._onInput = onInput;
+    }
+
+    inst.updateCounter = function () {
+        updateLabelFor(inst);
+    };
+    inst.updateLabel = function () {
+        updateLabelFor(inst);
+    };
+}
+
+
+function init() {
+    if (localStorage.getItem('noPreviewText') === 'true') {
+        return;
+    }
+
+    if (flags.get('lp_attach') !== 'true') return;
+
+    const textarea = document.querySelector('#body');
+    if (!textarea) return;
+
+    buildSoyMap();
+
+    const inst = attachToTextarea(textarea);
+    if (!inst) return;
+
+    state.textarea = inst.textarea;
+    state.wrapper = inst.wrapper;
+    state.previewBtn = inst.previewBtn;
+    state.previewBox = inst.previewBox;
+    state.resizeObserver = inst.resizeObserver;
+
+    applyFeatureState(inst);
+
+    const updateHandler = function () {
+        if (inst.updateCounter) inst.updateCounter();
+        if (inst.previewBox.style.display !== 'none') inst.renderPreview();
+    };
+    inst.textarea.addEventListener('livePreview:update', updateHandler);
+
+    window.livePreview = window.livePreview || {};
+    window.livePreview._instance = inst;
+    window.livePreview.updateCounter = function () {
+        updateHandler();
+    };
+    window.livePreview.setFlags = function (newFlags = {}) {
+        Object.keys(newFlags).forEach(k => {
+            if (k in DEFAULTS) {
+                flags.set(k, String(newFlags[k]));
+            }
+        });
+        applyFeatureState(inst);
+    };
+    window.livePreview.destroy = function () {
+        destroy();
+    };
+    window.livePreview.init = function () {
+        applyFeatureState(inst);
+    };
+
+    window.livePreview.triggerUpdateEvent = function () {
+        const ev = new Event('livePreview:update');
+        if (inst && inst.textarea) inst.textarea.dispatchEvent(ev);
+    };
+}
+
+function destroy() {
+    const inst = window.livePreview && window.livePreview._instance;
+    if (!inst || state.destroyed) return;
+    try { inst.textarea.removeAttribute(ATTACH_ATTR); } catch (e) { }
+    if (inst.wrapper && inst.textarea) {
+        try {
+            inst.wrapper.parentNode.replaceChild(inst.textarea, inst.wrapper);
+        } catch (e) {}
+    }
+    try { if (inst.previewBtn && inst.previewBtn.parentNode) inst.previewBtn.parentNode.removeChild(inst.previewBtn); } catch (e) { }
+    try { if (inst.previewBox && inst.previewBox.parentNode) inst.previewBox.parentNode.removeChild(inst.previewBox); } catch (e) { }
+    if (inst.resizeObserver) {
+        try { inst.resizeObserver.disconnect(); } catch (e) { }
+    }
+    if (inst._inputHandlerAttached && inst._onInput) {
+        try { inst.textarea.removeEventListener('input', inst._onInput); } catch (e) { }
+    }
+    state.destroyed = true;
+    window.livePreview = null;
+}
+
+try {
+    const existing = document.querySelector('#preview-button');
+    if (!existing) init();
+} catch (e) {
+    console.error('live-preview init failed', e);
+}
+
+window.livePreview = window.livePreview || {};
+window.livePreview.setFlags = window.livePreview.setFlags || function (newFlags = {}) {
+    Object.keys(newFlags).forEach(k => {
+        if (k in DEFAULTS) localStorage.setItem(k, String(newFlags[k]));
     });
+    if (window.livePreview._instance) {
+        window.livePreview._instance && (window.livePreview._instance.updateCounter && window.livePreview._instance.updateCounter());
+        if (window.livePreview._instance) {
+            if (typeof window.livePreview.init === 'function') window.livePreview.init();
+        }
+    }
+};
 
-    textarea.addEventListener('focus', syncPreviewSize);
-
-    renderPreview();
-})();

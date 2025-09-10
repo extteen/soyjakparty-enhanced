@@ -207,14 +207,6 @@ function createSEClockMenu() {
     searchmodeToggle.style.fontSize = '14px';
     searchmodeToggle.style.marginLeft = '8px';
 
-    const textpreviewToggle = document.createElement('button');
-    textpreviewToggle.textContent = localStorage.getItem('noPreviewText') === 'true' ? '❔' : '❓';
-    textpreviewToggle.title = 'Toggle text previewing feature';
-    textpreviewToggle.style.padding = '4px 8px';
-    textpreviewToggle.style.borderRadius = '4px';
-    textpreviewToggle.style.cursor = 'pointer';
-    textpreviewToggle.style.fontSize = '14px';
-    textpreviewToggle.style.marginLeft = '8px';
 
     clocksHeader.appendChild(clocksTitle);
     
@@ -274,13 +266,36 @@ function createSEClockMenu() {
     topControls.appendChild(gcpToggle);
     topControls.appendChild(transparencyToggle);
     topControls.appendChild(searchmodeToggle);
-    topControls.appendChild(textpreviewToggle);
+
 
     const settingsDivider = document.createElement('hr');
     settingsDivider.style.marginTop = '10px';
 
     menuBox.appendChild(topControls);
     menuBox.appendChild(settingsDivider);
+
+    const settingsHeader = document.createElement('div');
+    settingsHeader.style.display = 'flex';
+    settingsHeader.style.alignItems = 'center';
+    settingsHeader.style.gap = '250px';
+
+
+    const updateBtn = document.createElement('button');
+    updateBtn.textContent = 'Updates/About SPE';
+    updateBtn.title = 'Check for new versions';
+    updateBtn.style.padding = '4px 8px';
+    updateBtn.style.cursor = 'pointer';
+    updateBtn.style.borderRadius = '4px';
+    updateBtn.style.fontSize = '10px';
+    updateBtn.style.marginTop = '3px';
+    updateBtn.style.fontWeight = 'bold';
+    updateBtn.style.whiteSpace = 'nowrap';
+
+
+    updateBtn.addEventListener('click', () => {
+        updatePopup.style.display = 'block';
+    });
+
 
     const settingsTitle = document.createElement('div');
     settingsTitle.textContent = 'Settings';
@@ -295,7 +310,10 @@ function createSEClockMenu() {
     notifCheckbox.type = 'checkbox';
     notifCheckbox.id = 'notif-toggle';
 
-    settingsContainer.appendChild(settingsTitle);
+    settingsHeader.appendChild(settingsTitle);
+    settingsHeader.appendChild(updateBtn);
+
+    settingsContainer.appendChild(settingsHeader);
     notifLabel.prepend(notifCheckbox);
     settingsContainer.appendChild(notifLabel);
 
@@ -458,34 +476,63 @@ function createSEClockMenu() {
         rusearchModeCheckbox.dispatchEvent(new Event('change'));
     });
 
+    const previewcountMode = document.createElement('label');
+    previewcountMode.textContent = 'Select preview / character counter mode:';
+    previewcountMode.style.display = 'block';
+    previewcountMode.style.marginTop = '10px';
+    function createLPDropdown(container) {
+        const MODE_FLAGS = {
+            nothing: { lp_attach: 'false', lp_enableCounter: 'false', lp_enablePreview: 'false' },
+            counter: { lp_attach: 'true', lp_enableCounter: 'true', lp_enablePreview: 'false' },
+            preview: { lp_attach: 'true', lp_enableCounter: 'false', lp_enablePreview: 'true' },
+            both: { lp_attach: 'true', lp_enableCounter: 'true', lp_enablePreview: 'true' }
+        };
 
-    const textpreviewLabel = document.createElement('label');
-    textpreviewLabel.textContent = ' Disable text format previewing';
-    textpreviewLabel.style.display = 'block';
-    textpreviewLabel.style.marginTop = '10px';
+        const root = typeof container === 'string' ? document.querySelector(container) : (container || document.body);
+        if (!root) throw new Error('createLPDropdown: container not found');
 
-    const textpreviewCheckbox = document.createElement('input');
-    textpreviewCheckbox.type = 'checkbox';
-    textpreviewCheckbox.id = 'preview-toggle';
+        const EXISTING_ID = 'lp-mode-select';
+        const prev = document.getElementById(EXISTING_ID);
+        if (prev && prev.parentNode) prev.parentNode.removeChild(prev);
 
-    textpreviewLabel.prepend(textpreviewCheckbox);
-    settingsContainer.appendChild(textpreviewLabel);
+        const select = document.createElement('select');
+        select.id = EXISTING_ID;
 
-    textpreviewCheckbox.checked = localStorage.getItem('noPreviewText') === 'true';
+        [['nothing', 'Nothing'], ['counter', 'Only counter'], ['preview', 'Only preview'], ['both', 'Both']].forEach(([v, t]) => {
+            const opt = document.createElement('option');
+            opt.value = v;
+            opt.textContent = t;
+            select.appendChild(opt);
+        });
 
-    textpreviewCheckbox.addEventListener('change', () => {
-        localStorage.setItem('noPreviewText', textpreviewCheckbox.checked);
+        function currentMode() {
+            if (localStorage.getItem('lp_attach') === 'false') return 'nothing';
+            const c = localStorage.getItem('lp_enableCounter') === 'true';
+            const p = localStorage.getItem('lp_enablePreview') === 'true';
+            if (c && p) return 'both';
+            if (c && !p) return 'counter';
+            if (p && !c) return 'preview';
+            return 'nothing';
+        }
 
-        textpreviewToggle.textContent = textpreviewCheckbox.checked ? '❔' : '❓';
+        function writeFlags(flags) {
+            Object.keys(flags).forEach(k => localStorage.setItem(k, String(flags[k])));
+            try { if (window.livePreview && typeof window.livePreview.setFlags === 'function') window.livePreview.setFlags(flags); } catch (e) { }
+            try { document.dispatchEvent(new CustomEvent('livePreview:flagsChanged', { detail: flags })); } catch (e) { }
+        }
 
-    });
-    textpreviewToggle.addEventListener('click', () => {
-        textpreviewCheckbox.checked = !textpreviewCheckbox.checked;
-        localStorage.setItem('noPreviewText', textpreviewCheckbox.checked);
-        textpreviewToggle.textContent = textpreviewCheckbox.checked ? '❔' : '❓';
+        select.value = currentMode();
 
-        textpreviewCheckbox.dispatchEvent(new Event('change'));
-    });
+        select.addEventListener('change', () => {
+            const flags = MODE_FLAGS[select.value] || MODE_FLAGS.nothing;
+            writeFlags(flags);
+        });
+
+        root.appendChild(select);
+        return select;
+    }
+    settingsContainer.appendChild(previewcountMode)
+    createLPDropdown(settingsContainer);
 
     function updateTransparencyEffects() {
         const isDisabled = transparencyCheckbox.checked;
@@ -580,7 +627,6 @@ function createSEClockMenu() {
     });
 
 
-
     soundSelect.id = 'notif-sound-select';
 
     let customSoundURL = localStorage.getItem('customSound') || null;
@@ -667,22 +713,6 @@ function createSEClockMenu() {
 
     clearLinksBtn.style.borderRadius = '4px';
     settingsContainer.appendChild(clearLinksBtn);
-
-    const updateBtn = document.createElement('button');
-    updateBtn.textContent = 'Updates and About SPE';
-    updateBtn.title = 'Check for new versions';
-    updateBtn.style.padding = '4px 8px';
-    updateBtn.style.cursor = 'pointer';
-    updateBtn.style.borderRadius = '4px';
-    updateBtn.style.fontSize = '14px';
-    updateBtn.style.marginTop = '10px';
-
-    menuBox.appendChild(updateBtn);
-
-
-    updateBtn.addEventListener('click', () => {
-        updatePopup.style.display = 'block';
-    });
 
 
     // FUNCTIONS OF FEATURES IN SETTINGS
@@ -854,6 +884,55 @@ capcodes.forEach(capcode => {
   }
 });
 
+// NOTIFICATION
+let lastCount = 0;
+let userInteracted = false;
+['click', 'keydown', 'scroll'].forEach(evt =>
+    window.addEventListener(evt, () => userInteracted = true, { once: true })
+);
+function getTitleCount() {
+    const match = document.title.match(/^\((\d+)\)/);
+    return match ? parseInt(match[1], 10) : 0;
+}
+setInterval(() => {
+    const currentCount = getTitleCount();
+    const notifEnabled = localStorage.getItem('notifEnabled') === 'true';
+    if (
+        notifEnabled &&
+        currentCount > lastCount &&
+        userInteracted &&
+        document.hidden
+    ) {
+        audio.play().catch(e => {
+
+        });
+    }
+    lastCount = currentCount;
+}, 1000);
+
+if (localStorage.getItem('GCPEnabled') === 'true') {
+    if (window.top === window.self) {
+        if (!document.getElementById('gcp-dot-iframe')) {
+            const iframe = document.createElement('iframe');
+            iframe.id = 'gcp-dot-iframe';
+            iframe.src = "https://global-mind.org/gcpdot/gcp.html";
+            iframe.scrolling = "no";
+            iframe.style.overflow = "hidden";
+            iframe.style.cssText = `
+        position:fixed;
+        top:25px;
+        left:5px;
+        width:50px;
+        height:50px;
+        z-index:10000;
+        border:none;
+        border-radius:8px;
+      `;
+
+            document.body.appendChild(iframe);
+        }
+    }
+}
 
 // quotey quotes
 const enhancedButtons = new WeakSet();
@@ -1024,8 +1103,6 @@ window.addEventListener('storage', (event) => {
     }
 });
 
-
-
 // Update handling section
 
 const updatePopup = document.createElement('div');
@@ -1041,7 +1118,7 @@ updatePopup.style.boxShadow = '0 0 16px rgba(0,0,0,0.4)';
 updatePopup.style.minWidth = '600px';
 updatePopup.style.fontSize = '14px';
 updatePopup.style.display = 'none';
-updatePopup.style.textAlign = 'left'; // You can modify this later
+updatePopup.style.textAlign = 'left';
 updatePopup.style.fontFamily = 'sans-serif';
 updatePopup.style.maxWidth = '120vw';
 updatePopup.style.maxHeight = '100vh';
