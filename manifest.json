@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Soyjak Party Enhanced",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "Enhances the Soyjak.Party experience or something",
   "permissions": [
     "storage",
     "scripting",
-    "activeTab"
+    "activeTab",
+    "tabs"
   ],
   "host_permissions": [
     "*://soybooru.com/*",
@@ -16,20 +17,25 @@
   ],
   "action": {
     "default_icon": {
-      "48": "icons/sharty-48.png",
-      "96": "icons/sharty-96.png"
+      "32": "icons/spe-32.png",
+      "48": "icons/spe-64.png",
+      "64": "icons/spe-64.png",
+      "128": "icons/spe-64.png"
     }
   },
   "icons": {
-    "48": "icons/sharty-48.png",
-    "96": "icons/sharty-96.png"
+   "32": "icons/spe-32.png",
+   "48": "icons/spe-64.png",
+   "64": "icons/spe-64.png",
+   "128": "icons/spe-64.png"
   },
   "web_accessible_resources": [
     {
       "resources": [
         "icons/*",
         "audio/*",
-	"gcpdot.html"
+        "settings.html",
+        "settings.js"
       ],
       "matches": ["<all_urls>"]
     }
@@ -45,8 +51,7 @@
       "js": [
         "browser-polyfill.min.js",
         "main-functions.js",
-        "text-post-formatting.js",
-        "main-page-tweaks.js"
+        "text-post-formatting.js"
       ],
       "run_at": "document_end"
     }

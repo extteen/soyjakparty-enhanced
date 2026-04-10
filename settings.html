@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Soyjak Party Enhanced Settings</title>
+  <style>
+    :root {
+      /*--bg: #101216;*/
+      --bg: #000;
+      --fg: #eaeaea;
+      --muted: #a7a7a7;
+      --line: #2a2e36;
+      --btn: #1b2231;
+      --btn2: #232c40;
+      --danger: #ff6b6b;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --ui: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--ui);
+      font-size: 14px;
+    }
+
+    .wrap {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 28px 20px 60px;
+    }
+
+    h1 {
+      margin: 0 0 4px;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .version {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--muted);
+    }
+
+    .section {
+      border-top: 1px solid var(--line);
+      padding: 20px 0;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 6px 0;
+    }
+
+    .row-label {
+      flex: 1;
+      min-width: 0;
+      font-size: 13px;
+    }
+
+    .row-label small {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      margin-top: 2px;
+      line-height: 1.4;
+    }
+
+    label.toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      font-size: 13px;
+      user-select: none;
+    }
+
+    input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: #5a91ff;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    select {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--line);
+      color: var(--fg);
+      padding: 6px 10px;
+      outline: none;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    input[type="text"] {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--line);
+      color: var(--fg);
+      padding: 6px 10px;
+      outline: none;
+      font-size: 13px;
+      width: 160px;
+    }
+
+    input[type="file"] {
+      color: var(--muted);
+      font-size: 12px;
+      max-width: 220px;
+    }
+
+    button {
+      background: var(--btn);
+      border: 1px solid var(--line);
+      color: var(--fg);
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    button:hover { background: var(--btn2); }
+
+    button.danger {
+      border-color: rgba(255,107,107,0.35);
+      background: rgba(255,107,107,0.10);
+    }
+    button.danger:hover { background: rgba(255,107,107,0.18); }
+
+    .links-list {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .link-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 5px 8px;
+      border: 1px solid var(--line);
+    }
+
+    .link-item .link-type {
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      margin-right: 6px;
+      flex-shrink: 0;
+    }
+
+    code {
+      font-family: var(--mono);
+      font-size: 11px;
+      background: rgba(255,255,255,0.06);
+      padding: 1px 4px;
+    }
+
+    .link-item button {
+      padding: 3px 8px;
+      font-size: 11px;
+    }
+
+    .status {
+      margin-top: 14px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+      min-height: 16px;
+    }
+    .status.ok   { color: #7ee787; }
+    .status.warn { color: #f2cc60; }
+    .status.bad  { color: var(--danger); }
+
+    .about-links {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .about-links a {
+      color: #7eb4ea;
+      font-size: 13px;
+      text-decoration: none;
+    }
+    .about-links a:hover { text-decoration: underline; }
+
+    .update-result {
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .update-result.found { color: #7ee787; }
+    .update-result.bad   { color: var(--danger); }
+
+    .site-warn {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--danger);
+      line-height: 1.4;
+    }
+    .site-warn-yellow { color: #f2cc60; }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div style="display: flex; align-items: center; gap: 15px;">
+      <img style="image-rendering: pixelated;" src="icons/spe-64.png">
+      <div>
+        <h1>Soyjak Party Enhanced Settings</h1>
+        <div class="version" id="versionLine">version: …</div>
+      </div>
+    </div>
+    <div class="section">
+      <h2>Main</h2>
+      <p>Show SPE menu button on</p>
+      <div class="row">
+        <label class="toggle">
+          <input type="checkbox" id="spe_site_soyjak">
+          soyjak.st <span style="color:var(--muted);font-size:11px;margin-left:6px;">(main site)</span>
+        </label>
+      </div>
+      <div class="row">
+        <label class="toggle">
+          <input type="checkbox" id="spe_site_soybooru">
+          soybooru.com
+        </label>
+      </div>
+      <div class="row">
+        <label class="toggle">
+          <input type="checkbox" id="spe_site_wiki">
+          soyjakwiki.org
+        </label>
+      </div>
+
+      <div class="site-warn" id="siteWarnNone" style="display:none;">
+        ⚠ No sites selected, the menu button will not appear anywhere.
+      </div>
+      <div class="site-warn site-warn-yellow" id="siteWarnMain" style="display:none;">
+        ⚠ soyjak.st is deselected, the menu button won't appear on the main site.
+      </div>
+      <div class="row">
+        <label class="toggle">
+          <input type="checkbox" id="soybooruEnabled">
+          Enable Soybooru file selector on Soyjak Party
+        </label>
+      </div>
+      <div class="row">
+        <span class="row-label">
+          <small>Adds a "Soybooru" option to the file upload type field. Clicking opens a search modal to find and insert files directly from soybooru.com.</small>
+        </span>
+      </div>
+    </div>
+    <div class="section">
+      <h2>Notifications</h2>
+
+      <div class="row">
+        <label class="toggle">
+          <input type="checkbox" id="notifEnabled">
+          Enable notification sounds
+        </label>
+      </div>
+
+      <div class="row">
+        <span class="row-label">Default sound</span>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select id="soundSelect">
+            <option value="imrcv.mp3">imrcv.mp3</option>
+            <option value="doit.mp3">doit.mp3</option>
+            <option value="'cord.mp3">'cord.mp3</option>
+            <option value="yougotmail.mp3">yougotmail.mp3</option>
+          </select>
+          <button id="testSound">Test</button>
+        </div>
+      </div>
+
+      <div class="row" style="align-items:flex-start;">
+        <div class="row-label">
+          Custom sound
+          <small>Overrides the default sound on this device.</small>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <input type="file" id="customSoundFile" accept="audio/*" />
+          <button class="danger" id="clearCustomSound">Clear</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Appearance</h2>
+
+      <div class="row">
+        <label class="toggle">
+          <input type="checkbox" id="transparencyDisabled">
+          Disable transparency effects
+        </label>
+      </div>
+
+      <div class="row" style="align-items:flex-start;">
+        <div class="row-label">
+          Custom background
+          <small>Stored as an image on this device.</small>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <input type="file" id="customBgFile" accept="image/*" />
+          <button class="danger" id="clearCustomBg">Clear</button>
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <h2>Header</h2>
+
+      <div class="row">
+        <label class="toggle">
+          <input type="checkbox" id="headerWikiSearch">
+          Show Soyjak Wiki search bar in board header
+        </label>
+      </div>
+
+      <div class="row" style="margin-top:8px;">
+        <span class="row-label">
+          Board link
+          <small>Short board name, e.g. <code>gem</code></small>
+        </span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <input type="text" id="boardLinkInput" placeholder="e.g. gem" />
+          <button id="addBoardLink">Add</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <span class="row-label">
+          URL link
+          <small>Format: <code>label:https://example.com/</code></small>
+        </span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <input type="text" id="urlLinkInput" placeholder="e.g. wiki:https://soyjakwiki.org/" style="width:220px;" />
+          <button id="addUrlLink">Add</button>
+        </div>
+      </div>
+
+      <div class="row" style="justify-content:flex-end;">
+        <button class="danger" id="clearAllLinks">Clear all links</button>
+      </div>
+
+      <div class="links-list" id="linksList"></div>
+      <div style="color:var(--muted);font-size:12px;margin-top:6px;display:none;" id="linksEmpty">No links added.</div>
+    </div>
+    <div class="section">
+      <h2>Comment field</h2>
+      <div class="row">
+        <span class="row-label">Comment preview / counter mode</span>
+        <select id="lpMode">
+          <option value="nothing">Nothing</option>
+          <option value="counter">Only counter</option>
+          <option value="preview">Only preview</option>
+          <option value="both">Both</option>
+        </select>
+      </div>
+      <p>Comment textarea size</p>
+      <div class="row">
+        <label class="toggle">
+          <input type="checkbox" id="textareaDesktopOnly">
+          Apply only on desktop (skip on mobile / narrow screens)
+        </label>
+      </div>
+ 
+      <div class="row">
+        <span class="row-label">
+          Min width (px)
+          <small>Set to 0 to leave the site default.</small>
+        </span>
+        <input type="number" id="textareaMinW" min="0" max="1200" step="10" placeholder="400" />
+      </div>
+ 
+      <div class="row">
+        <span class="row-label">
+          Min height (px)
+          <small>Set to 0 to leave the site default.</small>
+        </span>
+        <input type="number" id="textareaMinH" min="0" max="800" step="10" placeholder="120" />
+      </div>
+    </div>
+    <div class="section">
+      <h2>Maintenance</h2>
+
+      <div class="row">
+        <span class="row-label">
+          Reset all settings to default
+        </span>
+        <button class="danger" id="resetAll">Reset</button>
+      </div>
+    </div>
+    <div class="section">
+      <h2>About &amp; Updates</h2>
+
+      <div class="about-links">
+        <p>Soyjak Party Enhanced by Extteen <br><small>Special thanks to Andy and anonymous user for contributing</small></p>
+        <a href="https://github.com/extteen/soyjakparty-enhanced" target="_blank">GitHub Repository</a>
+        <a href="https://github.com/extteen/soyjakparty-enhanced/releases" target="_blank">Changelog / Releases</a>
+      </div>
+
+      <div class="btn-row">
+        <button id="checkUpdateBtn">Check for updates</button>
+      </div>
+
+      <div class="update-result" id="updateResult"></div>
+    </div>
+
+    <div class="status" id="statusLine">Ready.</div>
+
+  </div>
+  <script src="settings.js"></script>
+</body>
+</html>

@@ -1,507 +1,5 @@
 //SOYMOJI, TEXT FORMAT AND OTHER RAISIN
-// EXTTEEN PRERELEASE 
-
-
-
-async function fetchHtmlContent(url) {
-
-    try {
-        const response = await fetch(url);
-        if (!response.ok) {
-
-            const error = new Error(`HTTP error! Status: ${response.status} for URL: ${url}`);
-            error.status = response.status;
-            throw error;
-        }
-        const htmlContent = await response.text();
-        return htmlContent;
-    } catch (error) {
-        console.error('Error fetching HTML content:', error);
-        throw error;
-    }
-}
-
-function parseAndExtractSoybooruThumbnails(htmlString) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(htmlString, 'text/html');
-
-    const thumbnailContainer = doc.querySelector('section#image-list div.navside.tab div.shm-image-list');
-    const extractedThumbnails = [];
-
-    if (thumbnailContainer) {
-        const postLinks = thumbnailContainer.querySelectorAll('a.shm-thumb-link');
-
-        postLinks.forEach(linkElement => {
-            const postId = linkElement.dataset.postId;
-            const tags = linkElement.dataset.tags || linkElement.querySelector('img')?.title?.split(' // ')[0] || 'N/A';
-
-            const imgElement = linkElement.querySelector('img');
-            let rawThumbnailSrc = imgElement ? imgElement.getAttribute('src') : null;
-
-            let thumbnailUrl = null;
-            let fullImageUrl = null;
-
-            if (rawThumbnailSrc && postId) {
-                if (rawThumbnailSrc.startsWith('http://') || rawThumbnailSrc.startsWith('https://')) {
-                    if (rawThumbnailSrc.includes('soybooru.com')) {
-                        thumbnailUrl = rawThumbnailSrc;
-                    } else {
-                        console.warn("Found absolute thumbnail URL not from soybooru.com:", rawThumbnailSrc);
-                        return;
-                    }
-                } else if (rawThumbnailSrc.startsWith('//')) {
-                    thumbnailUrl = `https:${rawThumbnailSrc}`;
-                } else if (rawThumbnailSrc.startsWith('/')) {
-                    thumbnailUrl = `https://soybooru.com${rawThumbnailSrc}`;
-                } else {
-                    thumbnailUrl = `https://soybooru.com/${rawThumbnailSrc}`;
-                }
-
-                const thumbUrlParts = thumbnailUrl.split('/');
-                const hash = thumbUrlParts[thumbUrlParts.length - 2];
-
-                const originalMime = linkElement.dataset.mime;
-                let originalExt = 'jpg';
-                if (originalMime) {
-                    const mimeParts = originalMime.split('/');
-                    if (mimeParts.length > 1) {
-                        originalExt = mimeParts[1].toLowerCase();
-                        if (originalExt === 'jpeg') originalExt = 'jpg';
-                        if (originalExt === 'mp4') originalExt = 'webm';
-                    }
-                } else if (imgElement && imgElement.src.includes('.')) {
-                    originalExt = imgElement.src.split('.').pop();
-                }
-
-                const filenameTitlePart = 'SoyBooru';
-                const encodedFilenameTitle = encodeURIComponent(filenameTitlePart);
-
-                fullImageUrl = `https://soybooru.com/_images/${hash}/${postId}%20-%20${encodedFilenameTitle}.${originalExt}`;
-            }
-
-            if (postId && thumbnailUrl && fullImageUrl) {
-                extractedThumbnails.push({
-                    postId: postId,
-                    thumbnailUrl: thumbnailUrl,
-                    fullImageUrl: fullImageUrl,
-                    tags: tags
-                });
-            } else {
-                console.warn(`Skipping post due to missing crucial data. PostId: ${postId}, Thumbnail: ${thumbnailUrl}, Full Image: ${fullImageUrl}`);
-            }
-        });
-    } else {
-        console.warn('Soybooru thumbnail container (section#image-list div.navside.tab div.shm-image-list) not found.');
-    }
-
-    return extractedThumbnails;
-}
-
-const soybooruDirectSearch = localStorage.getItem('soybooruDirectSearch') === 'true';
-let currentSearchTags = '';
-let currentPageNumber = 1;
-
-const soybooruFloatingWindow = document.createElement('div');
-soybooruFloatingWindow.id = 'soybooru-floating-window';
-soybooruFloatingWindow.style.display = 'none';
-soybooruFloatingWindow.style.position = 'fixed';
-soybooruFloatingWindow.style.top = '100px';
-soybooruFloatingWindow.style.left = '100px';
-soybooruFloatingWindow.style.width = '400px';
-soybooruFloatingWindow.style.maxHeight = '500px';
-soybooruFloatingWindow.style.background = '#fff';
-soybooruFloatingWindow.style.border = '1px solid #ccc';
-soybooruFloatingWindow.style.borderRadius = '8px';
-soybooruFloatingWindow.style.boxShadow = '0 5px 15px rgba(0,0,0,0.3)';
-soybooruFloatingWindow.style.zIndex = '10000';
-soybooruFloatingWindow.style.resize = 'both';
-soybooruFloatingWindow.style.minWidth = '250px';
-soybooruFloatingWindow.style.minHeight = '150px';
-soybooruFloatingWindow.style.flexDirection = 'column'; 
-soybooruFloatingWindow.style.boxSizing = 'border-box';
-
-document.body.appendChild(soybooruFloatingWindow);
-
-const windowHeader = document.createElement('div');
-windowHeader.style.padding = '8px 10px';
-windowHeader.style.background = '#f0f0f0';
-windowHeader.style.borderBottom = '1px solid #ddd';
-windowHeader.style.cursor = 'grab';
-windowHeader.style.display = 'flex';
-windowHeader.style.justifyContent = 'space-between';
-windowHeader.style.alignItems = 'center';
-windowHeader.style.fontWeight = 'bold';
-windowHeader.textContent = 'Soybooru Search';
-windowHeader.style.flexShrink = '0';
-soybooruFloatingWindow.appendChild(windowHeader);
-
-const closeButton = document.createElement('button');
-closeButton.textContent = '✖';
-closeButton.style.background = 'none';
-closeButton.style.border = 'none';
-closeButton.style.fontSize = '16px';
-closeButton.style.cursor = 'pointer';
-closeButton.style.color = '#888';
-closeButton.style.marginLeft = 'auto';
-closeButton.addEventListener('click', () => {
-    soybooruFloatingWindow.style.display = 'none';
-});
-windowHeader.appendChild(closeButton);
-
-const windowContent = document.createElement('div');
-windowContent.style.padding = '10px';
-windowContent.style.display = 'flex';
-windowContent.style.flexDirection = 'column';
-windowContent.style.gap = '8px';
-windowContent.style.flexGrow = '1';
-windowContent.style.minHeight = '0';
-windowContent.style.overflow = 'hidden'; 
-soybooruFloatingWindow.appendChild(windowContent);
-
-const floatingSearchInput = document.createElement('input');
-floatingSearchInput.type = 'text';
-floatingSearchInput.classList.add('soybooru-search-input-floating');
-floatingSearchInput.placeholder = 'Enter tags...(space between each tag)';
-floatingSearchInput.style.width = '100%';
-floatingSearchInput.style.padding = '5px';
-floatingSearchInput.style.boxSizing = 'border-box';
-floatingSearchInput.style.borderRadius = '4px';
-floatingSearchInput.style.border = '1px solid #ddd';
-windowContent.appendChild(floatingSearchInput);
-
-const floatingLoadingIndicator = document.createElement('div');
-floatingLoadingIndicator.classList.add('soybooru-loading-indicator-floating');
-floatingLoadingIndicator.textContent = 'Loading...';
-floatingLoadingIndicator.style.display = 'none';
-floatingLoadingIndicator.style.textAlign = 'center';
-floatingLoadingIndicator.style.padding = '10px';
-floatingLoadingIndicator.style.color = '#888';
-windowContent.appendChild(floatingLoadingIndicator);
-
-const floatingSearchResultsDisplay = document.createElement('div');
-floatingSearchResultsDisplay.classList.add('soybooru-search-results-floating');
-floatingSearchResultsDisplay.style.display = 'grid';
-floatingSearchResultsDisplay.style.gridTemplateColumns = 'repeat(auto-fill, minmax(100px, 1fr))';
-floatingSearchResultsDisplay.style.gap = '5px';
-floatingSearchResultsDisplay.style.overflowY = 'auto';
-floatingSearchResultsDisplay.style.overflowX = 'hidden';
-floatingSearchResultsDisplay.style.flexGrow = '1';
-floatingSearchResultsDisplay.style.minHeight = '0';
-floatingSearchResultsDisplay.style.padding = '5px';
-floatingSearchResultsDisplay.style.borderRadius = '4px';
-windowContent.appendChild(floatingSearchResultsDisplay);
-
-const paginationControls = document.createElement('div');
-paginationControls.style.display = 'flex';
-paginationControls.style.justifyContent = 'center';
-paginationControls.style.alignItems = 'center';
-paginationControls.style.gap = '10px';
-paginationControls.style.padding = '8px 0';
-paginationControls.style.borderTop = '1px solid #eee';
-paginationControls.style.flexShrink = '0';
-windowContent.appendChild(paginationControls);
-
-const prevPageButton = document.createElement('button');
-prevPageButton.textContent = 'Previous';
-prevPageButton.classList.add('soybooru-pagination-button');
-prevPageButton.disabled = true;
-paginationControls.appendChild(prevPageButton);
-
-const pageNumberInput = document.createElement('input');
-pageNumberInput.type = 'number';
-pageNumberInput.min = '1';
-pageNumberInput.value = '1';
-pageNumberInput.style.width = '50px';
-pageNumberInput.style.textAlign = 'center';
-pageNumberInput.style.padding = '3px';
-pageNumberInput.style.borderRadius = '4px';
-pageNumberInput.style.border = '1px solid #ddd';
-paginationControls.appendChild(pageNumberInput);
-
-const nextPageButton = document.createElement('button');
-nextPageButton.textContent = 'Next';
-nextPageButton.classList.add('soybooru-pagination-button');
-nextPageButton.disabled = true;
-paginationControls.appendChild(nextPageButton);
-
-let isDragging = false;
-let offsetX, offsetY;
-
-windowHeader.addEventListener('mousedown', (e) => {
-    isDragging = true;
-    offsetX = e.clientX - soybooruFloatingWindow.getBoundingClientRect().left;
-    offsetY = e.clientY - soybooruFloatingWindow.getBoundingClientRect().top;
-    soybooruFloatingWindow.style.cursor = 'grabbing';
-});
-
-document.addEventListener('mousemove', (e) => {
-    if (!isDragging) return;
-    soybooruFloatingWindow.style.left = `${e.clientX - offsetX}px`;
-    soybooruFloatingWindow.style.top = `${e.clientY - offsetY}px`;
-});
-
-document.addEventListener('mouseup', () => {
-    isDragging = false;
-    soybooruFloatingWindow.style.cursor = 'grab';
-});
-
-
-const thumbnailContextMenu = document.createElement('div');
-thumbnailContextMenu.id = 'soybooru-thumbnail-context-menu';
-thumbnailContextMenu.style.display = 'none';
-thumbnailContextMenu.style.position = 'absolute';
-thumbnailContextMenu.style.background = '#fff';
-thumbnailContextMenu.style.border = '1px solid #ccc';
-thumbnailContextMenu.style.borderRadius = '4px';
-thumbnailContextMenu.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
-thumbnailContextMenu.style.zIndex = '10001';
-thumbnailContextMenu.style.padding = '5px 0';
-
-document.body.appendChild(thumbnailContextMenu);
-
-function addContextMenuItem(text, action, postData, targetTextbox) {
-    const item = document.createElement('div');
-    item.textContent = text;
-    item.style.padding = '5px 10px';
-    item.style.cursor = 'pointer';
-    item.style.whiteSpace = 'nowrap';
-    item.addEventListener('mouseenter', () => item.style.backgroundColor = '#f0f0f0');
-    item.addEventListener('mouseleave', () => item.style.backgroundColor = 'transparent');
-    item.addEventListener('click', () => {
-        if (!targetTextbox) {
-            floatingSearchResultsDisplay.innerHTML = '<p style="text-align: center; color: #F44336; grid-column: 1 / -1;">Error: No active textbox detected. Please click on a text input before searching.</p>';
-            floatingLoadingIndicator.style.display = 'none';
-            setTimeout(() => soybooruFloatingWindow.style.display = 'none', 2500);
-            thumbnailContextMenu.style.display = 'none'; 
-            return; 
-        }
-        action(postData, targetTextbox);
-        thumbnailContextMenu.style.display = 'none';
-    });
-    thumbnailContextMenu.appendChild(item);
-}
-
-document.addEventListener('click', (e) => {
-    if (!thumbnailContextMenu.contains(e.target)) {
-        thumbnailContextMenu.style.display = 'none';
-    }
-});
-document.addEventListener('contextmenu', (e) => {
-    if (!thumbnailContextMenu.contains(e.target) && !e.target.closest('.soybooru-thumb-item')) {
-        thumbnailContextMenu.style.display = 'none';
-    }
-});
-
-
-function insertTextIntoTextbox(textbox, textToInsert) {
-    if (!textbox) return; 
-
-
-    if (document.activeElement !== textbox) {
-        textbox.focus();
-    }
-
-    if (textbox.tagName === 'TEXTAREA' || textbox.tagName === 'INPUT') {
-        const start = textbox.selectionStart || 0;
-        const end = textbox.selectionEnd || 0;
-        const currentText = textbox.value;
-        textbox.value = currentText.slice(0, start) + textToInsert + currentText.slice(end);
-        textbox.selectionStart = textbox.selectionEnd = start + textToInsert.length;
-    } else if (textbox.isContentEditable) {
-        
-        document.execCommand('insertText', false, textToInsert);
-    }
-}
-
-
-async function performSoybooruSearch(tags, page) {
-    floatingLoadingIndicator.style.display = 'block';
-    floatingSearchResultsDisplay.innerHTML = '';
-    prevPageButton.disabled = true;
-    nextPageButton.disabled = true; 
-
-    const htmlUrl = `https://soybooru.com/post/list/${encodeURIComponent(tags)}/${page}`;
-    let htmlText = null;
-    let is404 = false;
-
-    try {
-        htmlText = await fetchHtmlContent(htmlUrl);
-    } catch (error) {
-        if (error.status === 404) {
-            is404 = true;
-        }
-        console.error('Error during search:', error);
-    }
-
-    if (htmlText) {
-        const posts = parseAndExtractSoybooruThumbnails(htmlText);
-
-        if (posts.length > 0) {
-            renderSoybooruResults(posts, floatingSearchResultsDisplay, soybooruFloatingWindow.currentTextbox);
-            nextPageButton.disabled = false;
-        } else {
-            floatingSearchResultsDisplay.innerHTML = '<p style="text-align: center; color: #888; grid-column: 1 / -1;">No results found for these tags on this page.</p>';
-            nextPageButton.disabled = true;
-        }
-    } else {
-
-        if (is404) {
-            floatingSearchResultsDisplay.innerHTML = '<p style="text-align: center; color: #888; grid-column: 1 / -1;">No results found for these tags.</p>';
-        } else {
-            floatingSearchResultsDisplay.innerHTML = '<p style="text-align: center; color: #888; grid-column: 1 / -1;">Failed to load Soybooru content (try completing McChallenge).</p>';
-        }
-        nextPageButton.disabled = true;
-    }
-    floatingLoadingIndicator.style.display = 'none';
-
-
-    prevPageButton.disabled = (currentPageNumber <= 1);
-}
-
-
-floatingSearchInput.addEventListener('keydown', async (e) => {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        e.stopPropagation();
-        const soybooruDirectSearch = localStorage.getItem('soybooruDirectSearch') === 'true';
-        const query = floatingSearchInput.value.trim();
-        if (!query) return;
-
-        if (soybooruDirectSearch) {
-            window.open(`https://soybooru.com/post/list/${encodeURIComponent(query)}/1`, '_blank');
-            soybooruFloatingWindow.style.display = 'none';
-        } else {
-            currentSearchTags = query;
-            currentPageNumber = 1;
-            pageNumberInput.value = currentPageNumber;
-            await performSoybooruSearch(currentSearchTags, currentPageNumber);
-        }
-    }
-});
-
-prevPageButton.addEventListener('click', async () => {
-    if (currentPageNumber > 1 && currentSearchTags) {
-        currentPageNumber--;
-        pageNumberInput.value = currentPageNumber;
-        await performSoybooruSearch(currentSearchTags, currentPageNumber);
-    }
-});
-
-nextPageButton.addEventListener('click', async () => {
-    if (currentSearchTags && !nextPageButton.disabled) {
-        currentPageNumber++;
-        pageNumberInput.value = currentPageNumber;
-        await performSoybooruSearch(currentSearchTags, currentPageNumber);
-    }
-});
-
-pageNumberInput.addEventListener('change', async () => {
-    const newPage = parseInt(pageNumberInput.value, 10);
-    if (!isNaN(newPage) && newPage >= 1 && currentSearchTags) {
-        currentPageNumber = newPage;
-        await performSoybooruSearch(currentSearchTags, currentPageNumber);
-    } else {
-        pageNumberInput.value = currentPageNumber;
-    }
-});
-
-pageNumberInput.addEventListener('keydown', async (e) => {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        const newPage = parseInt(pageNumberInput.value, 10);
-        if (!isNaN(newPage) && newPage >= 1 && currentSearchTags) {
-            currentPageNumber = newPage;
-            await performSoybooruSearch(currentSearchTags, currentPageNumber);
-        } else {
-            pageNumberInput.value = currentPageNumber;
-        }
-    }
-});
-
-function renderSoybooruResults(posts, resultsDisplayElement, targetTextbox) {
-    resultsDisplayElement.innerHTML = '';
-
-    posts.forEach(post => {
-        const thumbWrapper = document.createElement('div');
-        thumbWrapper.classList.add('soybooru-thumb-item');
-        thumbWrapper.style.textAlign = 'center';
-        thumbWrapper.style.cursor = 'pointer';
-        thumbWrapper.style.padding = '3px';
-        thumbWrapper.style.border = '1px solid transparent';
-        thumbWrapper.style.borderRadius = '3px';
-        thumbWrapper.style.transition = 'all 0.1s ease';
-        thumbWrapper.style.width = '100%';
-        thumbWrapper.style.boxSizing = 'border-box';
-
-        const img = document.createElement('img');
-        img.src = post.thumbnailUrl;
-        img.alt = `Post ID: ${post.postId}`;
-        img.title = `ID: ${post.postId}\nTags: ${post.tags}`;
-        img.style.maxWidth = '100%';
-        img.style.height = 'auto';
-        img.style.display = 'block';
-        img.style.margin = '0 auto';
-        
-        thumbWrapper.appendChild(img);
-        resultsDisplayElement.appendChild(thumbWrapper);
-
-        thumbWrapper.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-
-            thumbnailContextMenu.innerHTML = '';
-
-              
-
-            addContextMenuItem('Download', async (data, textbox) => {
-                fetch(post.fullImageUrl)
-                    .then(response => response.blob())
-                    .then(blob => {
-                        const url = URL.createObjectURL(blob);
-                        const fallbackA = document.createElement('a');
-                        fallbackA.href = url;
-                        fallbackA.download = post.fullImageUrl.split('/').pop() || `soybooru_${post.postId}`;
-                        document.body.appendChild(fallbackA);
-                        fallbackA.click();
-                        setTimeout(() => {
-                            document.body.removeChild(fallbackA);
-                            URL.revokeObjectURL(url);
-                        }, 100);
-                    })
-                    .catch(fetchError => {
-                        console.error('Fetch download failed:', fetchError);
-                        window.open(post.fullImageUrl, '_blank');
-                    });
-            }, post, targetTextbox);
-
-
-            addContextMenuItem('Embed Thumbnail', (data, textbox) => {
-
-                insertTextIntoTextbox(textbox, `[thumb]${post.postId}[/thumb]`);
-                soybooruFloatingWindow.style.display = 'none'; 
-            }, post, targetTextbox);
-
-            addContextMenuItem('Open in New Tab', (data) => {
-                window.open(`https://soybooru.com/post/view/${data.postId}`, '_blank');
-                
-                soybooruFloatingWindow.style.display = 'none'; 
-            }, post, targetTextbox);
-
-            thumbnailContextMenu.style.left = `${e.clientX}px`;
-            thumbnailContextMenu.style.top = `${e.clientY}px`;
-            thumbnailContextMenu.style.display = 'block';
-        });
-
-        thumbWrapper.addEventListener('mouseenter', () => {
-            thumbWrapper.style.borderColor = '#aaa';
-            thumbWrapper.style.backgroundColor = '#f5f5f5';
-        });
-        thumbWrapper.addEventListener('mouseleave', () => {
-            thumbWrapper.style.borderColor = 'transparent';
-            thumbWrapper.style.backgroundColor = 'transparent';
-        });
-    });
-}
-
+// EXTTEEN RELEASE
 
 function applyTransparencyEffects(element, isTransparent) {
     if (isTransparent) {
@@ -518,8 +16,9 @@ function applyTransparencyEffects(element, isTransparent) {
     }
 }
 
-function updateAllTransparencyEffects() {
-    const isTransparent = localStorage.getItem('transparencyDisabled') !== 'true';
+async function updateAllTransparencyEffects() {
+    const { transparencyDisabled } = await browser.storage.sync.get({ transparencyDisabled: false });
+    const isTransparent = !transparencyDisabled;
 
     const formatMenu = document.getElementById('text-format-menu');
     if (formatMenu) applyTransparencyEffects(formatMenu, isTransparent);
@@ -553,13 +52,8 @@ function updateAllTransparencyEffects() {
         }
     });
 }
-
-//character and line counters
-//MEDS!!!!!!!!!! Not working well so nothing burger, don't worry next updatearino
-
-
-document.addEventListener('transparencyChanged', () => {
-    updateAllTransparencyEffects();
+browser.storage.onChanged.addListener((changes) => {
+    if (changes.transparencyDisabled !== undefined) updateAllTransparencyEffects();
 });
 
 const formatTiers = [
@@ -582,7 +76,7 @@ const formatTiers = [
         ]
     },
     {
-        title: 'Text Formats 2',
+        title: '',
         formats: [
             { label: 'Strikethrough', open: '~~', close: '~~' },
             { label: 'Underline', open: '__', close: '__' },
@@ -636,9 +130,10 @@ formatMenu.style.display = 'none';
 formatMenu.style.position = 'absolute';
 formatMenu.style.zIndex = '9999';
 formatMenu.style.padding = '5px';
-formatMenu.style.borderRadius = '5px';
 formatMenu.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
-applyTransparencyEffects(formatMenu, localStorage.getItem('transparencyDisabled') !== 'true');
+browser.storage.sync.get({ transparencyDisabled: false }).then(({ transparencyDisabled }) => {
+    applyTransparencyEffects(formatMenu, !transparencyDisabled);
+});
 
 
 formatTiers.forEach(tier => {
@@ -686,7 +181,6 @@ formatTiers.forEach(tier => {
             button.style.fontWeight = 'bold'
         } else if (format.label === 'Italic') {
             button.style.fontStyle = 'italic'
-            // Text Formats 2
         } else if (format.label === 'Strikethrough') {
             button.innerHTML = '<span style="pointer-events: none; text-decoration: line-through;">' + button.textContent + '</span>';
         } else if (format.label === 'Underline') {
@@ -747,6 +241,7 @@ formatTiers.forEach(tier => {
 
         
         button.style.padding = '5px 8px';
+        button.style.border = 'none';
         button.style.cursor = 'pointer';
         button.style.borderRadius = '1px';
         button.style.fontSize = '12px';
@@ -794,10 +289,11 @@ soymojiMenu.style.display = 'none';
 soymojiMenu.style.position = 'absolute';
 soymojiMenu.style.zIndex = '9999';
 soymojiMenu.style.padding = '5px';
-soymojiMenu.style.gridTemplateColumns = 'repeat(7, 1fr)';
 soymojiMenu.style.gap = '2px';
-soymojiMenu.style.width = '620px';
-soymojiMenu.style.borderRadius = '5px';
+soymojiMenu.style.width = 'min(480px, 90vw)';
+soymojiMenu.style.gridTemplateColumns = 'repeat(auto-fill, minmax(56px, 1fr))';
+soymojiMenu.style.maxHeight = '60vh';
+soymojiMenu.style.overflowY = 'auto';
 soymojiMenu.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
 applyTransparencyEffects(soymojiMenu, localStorage.getItem('transparencyDisabled') !== 'true');
 
@@ -846,13 +342,12 @@ soymojiFiles.forEach(filename => {
     const img = document.createElement('img');
     img.src = browser.runtime.getURL(`icons/soymoji/${filename}`);
     img.alt = shortcode;
-    img.style.height = '30px';
-    img.style.width = 'auto';
+    img.style.maxHeight = '30px';
+    img.style.maxWidth = '30px';
 
     const label = document.createElement('span');
     label.textContent = shortcode;
     label.style.fontSize = '10px'; 
-    //label.style.fontWeight = 'bold';
     label.style.marginTop = '2px';
     label.style.wordBreak = 'break-all';
 
@@ -902,92 +397,13 @@ updateAllTransparencyEffects();
 
 
 function enhanceTextbox(textbox) {
-    if (!textbox) {
-
-        return;
+    if (!textbox || textbox.dataset.enhanced === "true") return;
+    
+    const inst = attachToTextarea(textbox);
+    if (inst) {
+        textbox.dataset.enhanced = "true";
     }
-    if (textbox.dataset.enhanced === "true") {
-
-        return;
-    }
-
-
-    const wrapper = document.createElement('div');
-    wrapper.classList.add('textbox-wrapper');
-    textbox.parentNode.insertBefore(wrapper, textbox);
-    wrapper.appendChild(textbox);
-    wrapper.style.display = 'flex';
-    wrapper.style.flexDirection = 'column';
-    wrapper.style.alignItems = 'flex-start';
-    wrapper.style.gap = '0px';
-
-    const buttonColumn = document.createElement('div');
-    buttonColumn.classList.add('button-column');
-    buttonColumn.style.display = 'flex';
-    buttonColumn.style.flexDirection = 'row';
-    buttonColumn.style.gap = '10px';
-    buttonColumn.style.width = '425px';
-    wrapper.appendChild(buttonColumn);
-
-    const soymojiButton = document.createElement('button');
-    soymojiButton.classList.add("soymoji-button");
-    soymojiButton.innerText = "☰ Soymoji";
-    soymojiButton.type = "button";
-    buttonColumn.appendChild(soymojiButton);
-
-    const formatButton = document.createElement('button');
-    formatButton.classList.add("format-button-toggle");
-    formatButton.innerText = "☰ Text Format";
-    formatButton.type = "button";
-    buttonColumn.appendChild(formatButton);
-
-    const searchButton = document.createElement('button');
-    searchButton.classList.add("booru-search-button");
-    searchButton.innerText = "🔎︎ Soybooru Search";
-    searchButton.type = "button";
-    buttonColumn.appendChild(searchButton);
-
-
-    searchButton.addEventListener('click', () => {
-
-        const targetTextbox = document.getElementById('body');
-
-        if (targetTextbox && (targetTextbox.tagName === 'TEXTAREA' || targetTextbox.tagName === 'INPUT' || targetTextbox.isContentEditable)) {
-            soybooruFloatingWindow.currentTextbox = targetTextbox;
-        } else {
-            soybooruFloatingWindow.currentTextbox = document.activeElement;
-            if (soybooruFloatingWindow.currentTextbox && !(soybooruFloatingWindow.currentTextbox.tagName === 'TEXTAREA' || soybooruFloatingWindow.currentTextbox.tagName === 'INPUT' || soybooruFloatingWindow.currentTextbox.isContentEditable)) {
-                soybooruFloatingWindow.currentTextbox = document.querySelector('textarea, input[type="text"], input[type="search"], [contenteditable="true"]');
-            }
-            if (!soybooruFloatingWindow.currentTextbox) {
-                console.warn("No suitable text input or contenteditable element found on the page, even after trying to target #body.");
-            }
-        }
-
-        soybooruFloatingWindow.style.display = 'flex';
-        soybooruFloatingWindow.offsetHeight;
-
-        floatingSearchInput.value = '';
-        if (soybooruFloatingWindow.currentTextbox) {
-            let targetName = soybooruFloatingWindow.currentTextbox.id || soybooruFloatingWindow.currentTextbox.name || soybooruFloatingWindow.currentTextbox.tagName.toLowerCase();
-            floatingSearchResultsDisplay.innerHTML = `<p style="text-align: center; color: #888; grid-column: 1 / -1;">Enter tags and press Enter to search.`;
-        } else {
-            floatingSearchResultsDisplay.innerHTML = '<p style="text-align: center; color: #F44336; grid-column: 1 / -1;">No text input detected. Embed/Insert features may not work. Please click a text box before searching.</p>';
-        }
-
-        floatingLoadingIndicator.style.display = 'none';
-        floatingSearchInput.focus();
-
-        currentSearchTags = '';
-        currentPageNumber = 1;
-        pageNumberInput.value = currentPageNumber;
-        prevPageButton.disabled = true;
-        nextPageButton.disabled = true;
-    });
-
-
-
-    textbox.dataset.enhanced = "true";
+    return inst;
 }
 
 function enhanceEmailTextbox(emailTextbox) {
@@ -1009,16 +425,16 @@ function enhanceEmailTextbox(emailTextbox) {
     const dropdownBtn = document.createElement('button');
     dropdownBtn.classList.add('email-dropdown-button');
     dropdownBtn.type = 'button';
-    dropdownBtn.textContent = '▼';
+    dropdownBtn.textContent = '▾';
     dropdownBtn.style.position = 'absolute';
-    dropdownBtn.style.right = '5px';
+    dropdownBtn.style.right = '0px';
     dropdownBtn.style.top = '50%';
     dropdownBtn.style.transform = 'translateY(-50%)';
     dropdownBtn.style.border = 'none';
     dropdownBtn.style.background = 'transparent';
     dropdownBtn.style.cursor = 'pointer';
     dropdownBtn.style.padding = '2px';
-    dropdownBtn.style.fontSize = '14px';
+    dropdownBtn.style.fontSize = '28px';
     dropdownBtn.style.zIndex = '10';
     wrapper.appendChild(dropdownBtn);
 
@@ -1030,12 +446,11 @@ function enhanceEmailTextbox(emailTextbox) {
     dropdownMenu.style.marginTop = '5px';
     dropdownMenu.style.background = '#fff';
     dropdownMenu.style.border = '1px solid #ccc';
-    dropdownMenu.style.borderRadius = '4px';
     dropdownMenu.style.boxShadow = '0 2px 6px rgba(0,0,0,0.2)';
     dropdownMenu.style.display = 'none';
     dropdownMenu.style.zIndex = '9999';
     dropdownMenu.style.minWidth = '120px';
-    dropdownMenu.style.padding = '5px 0';
+    dropdownMenu.style.padding = '0px 0';
     wrapper.appendChild(dropdownMenu);
 
     const options = [
@@ -1125,32 +540,29 @@ function tryEnhanceQuickReplyFields() {
     const quickReplyContainer = document.getElementById('quick-reply');
 
     if (quickReplyContainer) {
-        
         setTimeout(() => {
             const body = quickReplyContainer.querySelector('textarea[name="body"]');
             const email = quickReplyContainer.querySelector('input[name="email"]');
 
             if (body && body.dataset.enhanced !== "true") {
-                
-                enhanceTextbox(body);
-            } else if (body) {
-                
+                const inst = attachToTextarea(body);
+                if (inst) {
+                    applyFeatureState(inst);
+                    body.dataset.enhanced = "true";
+                    window.livePreview = window.livePreview || {};
+                    window.livePreview._qrInstance = inst;
+                }
             }
 
             if (email && email.dataset.enhanced !== "true") {
-                
                 enhanceEmailTextbox(email);
-            } else if (email) {
-                
             }
-        }, 50); 
-    } else {
-        
+        }, 50);
     }
 }
 
 
-document.querySelectorAll('textarea[name="body"]:not([data-enhanced])').forEach(enhanceTextbox);
+//document.querySelectorAll('textarea[name="body"]:not([data-enhanced])').forEach(enhanceTextbox);
 document.querySelectorAll('input[name="email"]:not([data-enhanced])').forEach(enhanceEmailTextbox);
 
 
@@ -1212,7 +624,9 @@ document.addEventListener('click', (event) => {
     if (event.target && event.target.classList.contains('soymoji-button')) {
         event.preventDefault();
         event.stopPropagation();
-        const textbox = event.target.closest('.textbox-wrapper')?.querySelector('textarea[name="body"]');
+        
+        const wrapper = event.target.closest('.live-preview-wrapper');
+        const textbox = wrapper ? wrapper.querySelector('textarea[name="body"]') : null;
 
         if (textbox && soymojiMenu) {
             const rect = event.target.getBoundingClientRect();
@@ -1220,14 +634,9 @@ document.addEventListener('click', (event) => {
             soymojiMenu.style.top = `${rect.top + window.scrollY}px`;
             soymojiMenu.style.display = soymojiMenu.style.display === 'none' ? 'grid' : 'none';
 
-
             soymojiMenu.dataset.activeTextboxId = textbox.id || (textbox.id = `textbox-${Date.now()}`);
-        } else {
-           
         }
     }
-
-
     if (event.target && event.target.classList.contains('format-button-toggle')) {
         event.preventDefault();
         event.stopPropagation();
@@ -1238,42 +647,14 @@ document.addEventListener('click', (event) => {
             formatMenu.style.left = `${rect.right + 10}px`;
             formatMenu.style.top = `${rect.top + window.scrollY}px`;
             formatMenu.style.display = formatMenu.style.display === 'none' ? 'block' : 'none';
-
+            const wrapper = event.target.closest('.live-preview-wrapper');
+            const textbox = wrapper ? wrapper.querySelector('textarea[name="body"]') : null;
             
-            const textbox = event.target.closest('.textbox-wrapper')?.querySelector('textarea[name="body"]');
             if (textbox) {
-                formatMenu.dataset.activeTextboxId = textbox.id || (textbox.id = `textbox-${Date.now()}-main`);
-            } else {
-                
+                formatMenu.dataset.activeTextboxId = textbox.id || (textbox.id = `textbox-${Date.now()}`);
             }
-        } else {
-            
         }
     }
-
-    if (event.target && event.target.classList.contains('booru-search-button')) {
-        event.preventDefault();
-        event.stopPropagation();
-
-
-        const searchContainer = event.target.closest('.textbox-wrapper')?.querySelector('.soybooru-search-container');
-        const searchInput = searchContainer?.querySelector('.soybooru-search-input');
-
-        if (searchContainer && searchInput) {
-            let searchUIVisible = searchContainer.style.display !== 'none';
-            searchUIVisible = !searchUIVisible;
-
-            if (searchUIVisible) {
-                searchContainer.style.display = 'flex';
-                searchInput.focus();
-            } else {
-                searchContainer.style.display = 'none';
-            }
-        } else {
-            
-        }
-    }
-
 
     if (event.target && event.target.classList.contains('email-dropdown-button')) {
         event.preventDefault();
@@ -1431,8 +812,6 @@ document.addEventListener('click', (e) => {
         }
     });
 });
-
-
 // Text Previews from a random soyteen's modified userscript. thanks
 
 const DEFAULTS = {
@@ -1441,16 +820,40 @@ const DEFAULTS = {
     lp_enableCounter: 'false',
     lp_forcePreviewText: 'false'
 };
+const flags = new Map(Object.entries(DEFAULTS));
 
-const flags = {
-    get(key) {
-        const v = localStorage.getItem(key);
-        return v === null ? DEFAULTS[key] : v;
-    },
-    set(key, value) {
-        localStorage.setItem(key, String(value));
+browser.storage.sync.get({
+    lp_attach: DEFAULTS.lp_attach,
+    lp_enablePreview: DEFAULTS.lp_enablePreview,
+    lp_enableCounter: DEFAULTS.lp_enableCounter,
+    lp_forcePreviewText: DEFAULTS.lp_forcePreviewText,
+}).then(vals => {
+    Object.entries(vals).forEach(([k, v]) => flags.set(k, String(v)));
+    if (window.livePreview && window.livePreview._instance) {
+        applyFeatureState(window.livePreview._instance);
     }
-};
+    if (window.livePreview && window.livePreview._qrInstance) {
+        applyFeatureState(window.livePreview._qrInstance);
+    }
+});
+browser.storage.onChanged.addListener((changes) => {
+    const lpKeys = ['lp_attach', 'lp_enablePreview', 'lp_enableCounter', 'lp_forcePreviewText'];
+    let changed = false;
+    lpKeys.forEach(k => {
+        if (changes[k] !== undefined) {
+            flags.set(k, String(changes[k].newValue));
+            changed = true;
+        }
+    });
+    if (changed) {
+        if (window.livePreview && window.livePreview._instance) {
+            applyFeatureState(window.livePreview._instance);
+        }
+        if (window.livePreview && window.livePreview._qrInstance) {
+            applyFeatureState(window.livePreview._qrInstance);
+        }
+    }
+});
 
 const ATTACH_ATTR = 'data-live-preview-attached';
 
@@ -1583,8 +986,17 @@ function applyFormatting(text) {
 function attachToTextarea(textarea) {
     if (!textarea || textarea.hasAttribute(ATTACH_ATTR)) return null;
 
-    textarea.style.minWidth = '420px';
-    textarea.style.minHeight = '120px';
+    browser.storage.sync.get({
+        textareaMinW:        400,
+        textareaMinH:        120,
+        textareaDesktopOnly: true,
+    }).then(({ textareaMinW, textareaMinH, textareaDesktopOnly }) => {
+        const isMobile = textareaDesktopOnly && window.innerWidth < 600;
+        if (isMobile) return;
+     
+        if (textareaMinW > 0) textarea.style.minWidth  = textareaMinW  + 'px';
+        if (textareaMinH > 0) textarea.style.minHeight = textareaMinH + 'px';
+    });
 
     const wrapper = document.createElement('div');
     wrapper.className = 'live-preview-wrapper';
@@ -1599,26 +1011,215 @@ function attachToTextarea(textarea) {
     textarea.style.position = 'relative';
     textarea.style.zIndex = '1';
 
+    const buttonContainer = document.createElement('div');
+    Object.assign(buttonContainer.style, {
+        position: 'absolute',
+        right: '9px',
+        bottom: '9px',
+        display: 'flex',
+        gap: '5px',
+        zIndex: '32'
+    });
+
+    // === der soymoji button
+    const soymojiButton = document.createElement('button');
+    soymojiButton.classList.add("soymoji-button");
+    soymojiButton.type = "button";
+    soymojiButton.tabIndex = 0;
+    soymojiButton.title = "Soymoji Menu";
+
+    let currentSoymojiIndex = Math.floor(Math.random() * soymojiFiles.length);
+
+    function getRandomSoymoji(excludeIndex = -1) {
+        if (!soymojiFiles || soymojiFiles.length < 2) return 0;
+        
+        let newIndex;
+        do {
+            newIndex = Math.floor(Math.random() * soymojiFiles.length);
+        } while (newIndex === excludeIndex && soymojiFiles.length > 1);
+        
+        return newIndex;
+    }
+
+    function updateSoymojiButton(index) {
+        if (!soymojiFiles || !soymojiFiles[index]) {
+            soymojiButton.textContent = "S";
+            return;
+        }
+        
+        const filename = soymojiFiles[index];
+        const shortcode = filename.split('.')[0];
+
+        soymojiButton.innerHTML = '';
+
+        const img = document.createElement('img');
+        img.src = browser.runtime.getURL(`icons/soymoji/${filename}`);
+        img.alt = shortcode;
+        img.title = shortcode;
+        img.style.height = '24px';
+        img.style.width = '24px';
+        img.style.objectFit = 'contain';
+        img.style.verticalAlign = 'middle';
+        img.style.imageRendering = 'pixelated';
+        img.style.pointerEvents = 'none';
+        img.style.filter = 'drop-shadow(0px 1px 1px rgba(0,0,0,0.3))';
+        
+        soymojiButton.appendChild(img);
+    }
+
+    updateSoymojiButton(currentSoymojiIndex);
+
+    soymojiButton.addEventListener('mouseenter', () => {
+        currentSoymojiIndex = getRandomSoymoji(currentSoymojiIndex);
+        updateSoymojiButton(currentSoymojiIndex);
+    });
+
+    soymojiButton.addEventListener('focus', () => {
+        currentSoymojiIndex = getRandomSoymoji(currentSoymojiIndex);
+        updateSoymojiButton(currentSoymojiIndex);
+    });
+
+    Object.assign(soymojiButton.style, {
+        padding: '2px 6px',
+        border: '1px solid rgba(0,0,0,0.2)',
+        background: 'white',
+        backdropFilter: 'blur(4px)',
+        cursor: 'pointer',
+        fontSize: '11px',
+        color: '#222',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+        maxWidth: '26px',
+        height: '26px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+    });
+
+    // === format button
+    const formatButton = document.createElement('button');
+    formatButton.classList.add("format-button-toggle");
+    formatButton.type = "button";
+    formatButton.tabIndex = 0;
+    formatButton.title = "Text Formatting";
+    const formatColors = [
+        '#000000', // Black
+        '#af0a0f', // Red
+        '#2424ad', // Blue  
+        '#720b98', // Purple
+        '#FD3D98', // Pink
+    ];
+
+    const fontWeightOptions = ['normal', 'bold'];
+    const fontStyleOptions = ['normal', 'italic'];
+    const textDecorationOptions = ['none', 'underline', 'line-through'];
+    const textShadowOptions = [
+        'none',
+        '0 0 3px #ff0000, 0 0 5px #ff0000', // Red glow
+        '0 0 3px #00fe20, 0 0 5px #00fe20', // Green glow
+        '0 0 3px #ffff00, 0 0 5px #fffb00', // Yellow glow
+        '0 0 3px #36d7f7, 0 0 5px #36d7f7'  // Blue glow
+    ];
+
+    function getRandomItem(arr) {
+        return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function generateRandomFormat() {
+        return {
+            label: 'A',
+            style: {
+                color: getRandomItem(formatColors),
+                textDecoration: getRandomItem(textDecorationOptions),
+                fontWeight: getRandomItem(fontWeightOptions),
+                fontStyle: getRandomItem(fontStyleOptions),
+                textShadow: getRandomItem(textShadowOptions)
+            }
+        };
+    }
+
+    function updateFormatButtonWithStyle(style) {
+        formatButton.innerHTML = '';
+
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = 'A';
+        labelSpan.style.pointerEvents = 'none';
+
+        Object.assign(labelSpan.style, style);
+
+        labelSpan.style.fontSize = '16px';
+        labelSpan.style.display = 'inline-block';
+        labelSpan.style.lineHeight = '1';
+        
+        formatButton.appendChild(labelSpan);
+    }
+
+    const defaultStyle = {
+        color: '#2424ad',
+        textDecoration: 'underline',
+        fontWeight: 'normal',
+        fontStyle: 'normal',
+        textShadow: 'none'
+    };
+    updateFormatButtonWithStyle(defaultStyle);
+
+    let currentFormatStyle = { ...defaultStyle };
+
+    formatButton.addEventListener('mouseenter', () => {
+        const randomFormat = generateRandomFormat();
+        currentFormatStyle = randomFormat.style;
+        updateFormatButtonWithStyle(currentFormatStyle);
+    });
+
+    formatButton.addEventListener('focus', () => {
+        const randomFormat = generateRandomFormat();
+        currentFormatStyle = randomFormat.style;
+        updateFormatButtonWithStyle(currentFormatStyle);
+    });
+
+    formatButton.addEventListener('mouseleave', () => {
+        updateFormatButtonWithStyle(defaultStyle);
+        currentFormatStyle = { ...defaultStyle };
+    });
+
+    formatButton.addEventListener('blur', () => {
+        updateFormatButtonWithStyle(defaultStyle);
+        currentFormatStyle = { ...defaultStyle };
+    });
+
+    Object.assign(formatButton.style, {
+        padding: '2px 6px',
+        border: '1px solid rgba(0,0,0,0.2)',
+        background: 'white',
+        backdropFilter: 'blur(4px)',
+        cursor: 'pointer',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+        minWidth: '26px',
+        height: '26px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+    });
+
     const previewBtn = document.createElement('button');
     previewBtn.id = 'preview-button';
     previewBtn.type = 'button';
     previewBtn.tabIndex = 0;
 
     Object.assign(previewBtn.style, {
-        position: 'absolute',
-        right: '9px',
-        bottom: '9px',
         padding: '2px 6px',
-        borderRadius: '4px',
         border: '1px solid rgba(0,0,0,0.2)',
         background: 'white', 
         backdropFilter: 'blur(4px)',
         cursor: 'pointer',
-        zIndex: '32',
         fontSize: '11px',
         color: '#222',
         boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
     });
+
+    buttonContainer.appendChild(soymojiButton);
+    buttonContainer.appendChild(formatButton);
+    buttonContainer.appendChild(previewBtn);
+    wrapper.appendChild(buttonContainer);
 
     const previewBox = document.createElement('div');
     previewBox.id = 'live-preview';
@@ -1637,7 +1238,6 @@ function attachToTextarea(textarea) {
         boxSizing: 'border-box'
     });
 
-    wrapper.appendChild(previewBtn);
     wrapper.appendChild(previewBox);
 
     textarea.setAttribute(ATTACH_ATTR, 'true');
@@ -1696,13 +1296,15 @@ function attachToTextarea(textarea) {
 
     function renderPreview() {
         const text = textarea.value;
-        previewBox.innerHTML = text ? applyFormatting(text) : '<i>Text formatting preview...</i>';
+        previewBox.innerHTML = text ? applyFormatting(text) : '<i>Text preview...</i>';
     }
 
     return {
         wrapper,
         textarea,
         previewBtn,
+        soymojiButton,
+        formatButton,
         previewBox,
         syncPreviewSize,
         renderPreview,
@@ -1899,13 +1501,12 @@ try {
 window.livePreview = window.livePreview || {};
 window.livePreview.setFlags = window.livePreview.setFlags || function (newFlags = {}) {
     Object.keys(newFlags).forEach(k => {
-        if (k in DEFAULTS) localStorage.setItem(k, String(newFlags[k]));
+        if (k in DEFAULTS) flags.set(k, String(newFlags[k]));
     });
     if (window.livePreview._instance) {
-        window.livePreview._instance && (window.livePreview._instance.updateCounter && window.livePreview._instance.updateCounter());
-        if (window.livePreview._instance) {
-            if (typeof window.livePreview.init === 'function') window.livePreview.init();
-        }
+        applyFeatureState(window.livePreview._instance);
+    }
+    if (window.livePreview._qrInstance) {
+        applyFeatureState(window.livePreview._qrInstance);
     }
 };
-
